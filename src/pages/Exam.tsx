@@ -16,7 +16,6 @@ import {
   EyeOff
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { ExamCalculator } from "@/components/ExamCalculator";
 import { QuestionPanel } from "@/components/QuestionPanel";
 import { mockQuestions } from "@/data/mockQuestions";
 
@@ -28,7 +27,6 @@ const Exam = () => {
   const [currentQuestion, setCurrentQuestion] = useState(1);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [markedForReview, setMarkedForReview] = useState<Set<number>>(new Set());
-  const [showCalculator, setShowCalculator] = useState(false);
   const [showQuestionPanel, setShowQuestionPanel] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
@@ -102,6 +100,10 @@ const Exam = () => {
     }
   };
 
+  const openCalculator = () => {
+    window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
+  };
+
   const getQuestionStatus = (questionId: number) => {
     const isAnswered = answers[questionId];
     const isMarked = markedForReview.has(questionId);
@@ -146,7 +148,7 @@ const Exam = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowCalculator(!showCalculator)}
+              onClick={openCalculator}
             >
               <Calculator className="w-4 h-4 mr-1" />
               Calculator
@@ -361,25 +363,6 @@ const Exam = () => {
           </div>
         </div>
       </div>
-
-      {/* Calculator Modal */}
-      {showCalculator && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Scientific Calculator</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowCalculator(false)}
-              >
-                ×
-              </Button>
-            </div>
-            <ExamCalculator />
-          </div>
-        </div>
-      )}
     </div>
   );
 };
