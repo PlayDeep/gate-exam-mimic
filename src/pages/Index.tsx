@@ -111,8 +111,8 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="outline">Previous Tests</Button>
-              <Button variant="outline">Performance</Button>
+              <Button variant="outline" onClick={() => navigate('/previous-tests')}>Previous Tests</Button>
+              <Button variant="outline" onClick={() => navigate('/performance')}>Performance</Button>
             </div>
           </div>
         </div>

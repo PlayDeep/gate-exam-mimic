@@ -246,7 +246,7 @@ export const ExamCalculator = () => {
         <Button variant="outline" size="sm" onClick={() => inputNumber('7')}>7</Button>
         <Button variant="outline" size="sm" onClick={() => inputNumber('8')}>8</Button>
         <Button variant="outline" size="sm" onClick={() => inputNumber('9')}>9</Button>
-        <Button variant="outline" size="sm" onClick={() => inputNumber('('))}>(</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('(')}>(</Button>
         <Button variant="outline" size="sm" onClick={() => performOperation('×')}>×</Button>
 
         {/* Row 3 */}
