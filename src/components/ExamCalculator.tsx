@@ -7,6 +7,8 @@ export const ExamCalculator = () => {
   const [previousValue, setPreviousValue] = useState<number | null>(null);
   const [operation, setOperation] = useState<string | null>(null);
   const [waitingForOperand, setWaitingForOperand] = useState(false);
+  const [memory, setMemory] = useState(0);
+  const [isRadians, setIsRadians] = useState(true);
 
   const inputNumber = (num: string) => {
     if (waitingForOperand) {
@@ -31,6 +33,18 @@ export const ExamCalculator = () => {
     setPreviousValue(null);
     setOperation(null);
     setWaitingForOperand(false);
+  };
+
+  const clearEntry = () => {
+    setDisplay('0');
+  };
+
+  const backspace = () => {
+    if (display.length > 1) {
+      setDisplay(display.slice(0, -1));
+    } else {
+      setDisplay('0');
+    }
   };
 
   const performOperation = (nextOperation: string) => {
@@ -60,6 +74,8 @@ export const ExamCalculator = () => {
         return firstValue * secondValue;
       case '÷':
         return firstValue / secondValue;
+      case '^':
+        return Math.pow(firstValue, secondValue);
       case '=':
         return secondValue;
       default:
@@ -73,13 +89,22 @@ export const ExamCalculator = () => {
 
     switch (func) {
       case 'sin':
-        result = Math.sin(inputValue * Math.PI / 180);
+        result = isRadians ? Math.sin(inputValue) : Math.sin(inputValue * Math.PI / 180);
         break;
       case 'cos':
-        result = Math.cos(inputValue * Math.PI / 180);
+        result = isRadians ? Math.cos(inputValue) : Math.cos(inputValue * Math.PI / 180);
         break;
       case 'tan':
-        result = Math.tan(inputValue * Math.PI / 180);
+        result = isRadians ? Math.tan(inputValue) : Math.tan(inputValue * Math.PI / 180);
+        break;
+      case 'asin':
+        result = isRadians ? Math.asin(inputValue) : Math.asin(inputValue) * 180 / Math.PI;
+        break;
+      case 'acos':
+        result = isRadians ? Math.acos(inputValue) : Math.acos(inputValue) * 180 / Math.PI;
+        break;
+      case 'atan':
+        result = isRadians ? Math.atan(inputValue) : Math.atan(inputValue) * 180 / Math.PI;
         break;
       case 'log':
         result = Math.log10(inputValue);
@@ -93,8 +118,29 @@ export const ExamCalculator = () => {
       case 'square':
         result = inputValue * inputValue;
         break;
+      case 'cube':
+        result = Math.pow(inputValue, 3);
+        break;
       case 'factorial':
         result = factorial(inputValue);
+        break;
+      case 'exp':
+        result = Math.exp(inputValue);
+        break;
+      case '1/x':
+        result = 1 / inputValue;
+        break;
+      case 'abs':
+        result = Math.abs(inputValue);
+        break;
+      case 'negate':
+        result = -inputValue;
+        break;
+      case 'pi':
+        result = Math.PI;
+        break;
+      case 'e':
+        result = Math.E;
         break;
       default:
         return;
@@ -105,60 +151,123 @@ export const ExamCalculator = () => {
   };
 
   const factorial = (n: number): number => {
+    if (n < 0 || n !== Math.floor(n)) return NaN;
     if (n === 0 || n === 1) return 1;
     return n * factorial(n - 1);
   };
 
-  const ButtonGrid = ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div className={`grid ${className}`}>
-      {children}
-    </div>
-  );
+  const memoryOperation = (operation: string) => {
+    const inputValue = parseFloat(display);
+    switch (operation) {
+      case 'MC':
+        setMemory(0);
+        break;
+      case 'MR':
+        setDisplay(String(memory));
+        setWaitingForOperand(true);
+        break;
+      case 'M+':
+        setMemory(memory + inputValue);
+        break;
+      case 'M-':
+        setMemory(memory - inputValue);
+        break;
+      case 'MS':
+        setMemory(inputValue);
+        break;
+    }
+  };
 
   return (
-    <div className="bg-gray-100 p-4 rounded-lg w-80">
+    <div className="bg-gray-50 p-4 rounded-lg w-96 border">
       {/* Display */}
-      <div className="bg-black text-white p-4 rounded mb-4 text-right">
-        <div className="text-2xl font-mono overflow-hidden">{display}</div>
+      <div className="bg-white border-2 border-gray-300 p-3 rounded mb-4">
+        <div className="text-right">
+          <div className="text-xs text-gray-500 mb-1">
+            {memory !== 0 && <span className="mr-2">M</span>}
+            <span>{isRadians ? 'RAD' : 'DEG'}</span>
+          </div>
+          <div className="text-2xl font-mono h-8 overflow-hidden">{display}</div>
+        </div>
       </div>
 
-      {/* Scientific Functions */}
-      <ButtonGrid className="grid-cols-4 gap-2 mb-4">
+      {/* Mode and Memory Row */}
+      <div className="grid grid-cols-6 gap-1 mb-2">
+        <Button variant="outline" size="sm" onClick={() => setIsRadians(!isRadians)}>
+          {isRadians ? 'RAD' : 'DEG'}
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => memoryOperation('MC')}>MC</Button>
+        <Button variant="outline" size="sm" onClick={() => memoryOperation('MR')}>MR</Button>
+        <Button variant="outline" size="sm" onClick={() => memoryOperation('M+')}>M+</Button>
+        <Button variant="outline" size="sm" onClick={() => memoryOperation('M-')}>M-</Button>
+        <Button variant="outline" size="sm" onClick={() => memoryOperation('MS')}>MS</Button>
+      </div>
+
+      {/* Scientific Functions Row 1 */}
+      <div className="grid grid-cols-6 gap-1 mb-2">
         <Button variant="outline" size="sm" onClick={() => performScientific('sin')}>sin</Button>
         <Button variant="outline" size="sm" onClick={() => performScientific('cos')}>cos</Button>
         <Button variant="outline" size="sm" onClick={() => performScientific('tan')}>tan</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('asin')}>sin⁻¹</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('acos')}>cos⁻¹</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('atan')}>tan⁻¹</Button>
+      </div>
+
+      {/* Scientific Functions Row 2 */}
+      <div className="grid grid-cols-6 gap-1 mb-2">
         <Button variant="outline" size="sm" onClick={() => performScientific('log')}>log</Button>
         <Button variant="outline" size="sm" onClick={() => performScientific('ln')}>ln</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('exp')}>eˣ</Button>
         <Button variant="outline" size="sm" onClick={() => performScientific('sqrt')}>√</Button>
         <Button variant="outline" size="sm" onClick={() => performScientific('square')}>x²</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('cube')}>x³</Button>
+      </div>
+
+      {/* Scientific Functions Row 3 */}
+      <div className="grid grid-cols-6 gap-1 mb-2">
+        <Button variant="outline" size="sm" onClick={() => performScientific('1/x')}>1/x</Button>
         <Button variant="outline" size="sm" onClick={() => performScientific('factorial')}>x!</Button>
-      </ButtonGrid>
+        <Button variant="outline" size="sm" onClick={() => performOperation('^')}>xʸ</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('abs')}>|x|</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('pi')}>π</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('e')}>e</Button>
+      </div>
 
       {/* Main Calculator */}
-      <ButtonGrid className="grid-cols-4 gap-2">
-        <Button variant="destructive" onClick={clear}>C</Button>
-        <Button variant="outline" onClick={() => setDisplay(display.slice(0, -1) || '0')}>←</Button>
-        <Button variant="outline" onClick={() => performOperation('÷')}>÷</Button>
-        <Button variant="outline" onClick={() => performOperation('×')}>×</Button>
+      <div className="grid grid-cols-5 gap-1">
+        {/* Row 1 */}
+        <Button variant="destructive" size="sm" onClick={clear}>C</Button>
+        <Button variant="outline" size="sm" onClick={clearEntry}>CE</Button>
+        <Button variant="outline" size="sm" onClick={backspace}>⌫</Button>
+        <Button variant="outline" size="sm" onClick={() => performScientific('negate')}>±</Button>
+        <Button variant="outline" size="sm" onClick={() => performOperation('÷')}>÷</Button>
 
-        <Button variant="outline" onClick={() => inputNumber('7')}>7</Button>
-        <Button variant="outline" onClick={() => inputNumber('8')}>8</Button>
-        <Button variant="outline" onClick={() => inputNumber('9')}>9</Button>
-        <Button variant="outline" onClick={() => performOperation('-')}>-</Button>
+        {/* Row 2 */}
+        <Button variant="outline" size="sm" onClick={() => inputNumber('7')}>7</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('8')}>8</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('9')}>9</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('('))}>(</Button>
+        <Button variant="outline" size="sm" onClick={() => performOperation('×')}>×</Button>
 
-        <Button variant="outline" onClick={() => inputNumber('4')}>4</Button>
-        <Button variant="outline" onClick={() => inputNumber('5')}>5</Button>
-        <Button variant="outline" onClick={() => inputNumber('6')}>6</Button>
-        <Button variant="outline" onClick={() => performOperation('+')}>+</Button>
+        {/* Row 3 */}
+        <Button variant="outline" size="sm" onClick={() => inputNumber('4')}>4</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('5')}>5</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('6')}>6</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber(')')}>)</Button>
+        <Button variant="outline" size="sm" onClick={() => performOperation('-')}>-</Button>
 
-        <Button variant="outline" onClick={() => inputNumber('1')}>1</Button>
-        <Button variant="outline" onClick={() => inputNumber('2')}>2</Button>
-        <Button variant="outline" onClick={() => inputNumber('3')}>3</Button>
-        <Button variant="default" className="row-span-2" onClick={() => performOperation('=')}>=</Button>
+        {/* Row 4 */}
+        <Button variant="outline" size="sm" onClick={() => inputNumber('1')}>1</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('2')}>2</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('3')}>3</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('0')}>0</Button>
+        <Button variant="outline" size="sm" onClick={() => performOperation('+')}>+</Button>
 
-        <Button variant="outline" className="col-span-2" onClick={() => inputNumber('0')}>0</Button>
-        <Button variant="outline" onClick={inputDot}>.</Button>
-      </ButtonGrid>
+        {/* Row 5 */}
+        <Button variant="outline" size="sm" className="col-span-2" onClick={inputDot}>.</Button>
+        <Button variant="outline" size="sm" onClick={() => inputNumber('00')}>00</Button>
+        <Button variant="default" size="sm" className="col-span-2" onClick={() => performOperation('=')}>=</Button>
+      </div>
     </div>
   );
 };
