@@ -1,9 +1,10 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Clock, Calculator, Award, Users, TrendingUp } from "lucide-react";
+import { BookOpen, Clock, Calculator, Award, Users, TrendingUp, LogOut, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import AuthModal from "@/components/auth/AuthModal";
 
 const subjects = [
   {
@@ -87,12 +88,23 @@ const stats = [
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user, isAdmin, signOut } = useAuth();
   const [selectedSubject, setSelectedSubject] = useState("");
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleStartTest = () => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    
     if (selectedSubject) {
       navigate(`/exam/${selectedSubject}`);
     }
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
   };
 
   return (
@@ -111,8 +123,29 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="outline" onClick={() => navigate('/previous-tests')}>Previous Tests</Button>
-              <Button variant="outline" onClick={() => navigate('/performance')}>Performance</Button>
+              {user ? (
+                <>
+                  <span className="text-sm text-gray-600">
+                    Welcome, {user.email}
+                  </span>
+                  {isAdmin && (
+                    <Button variant="outline" onClick={() => navigate('/admin')}>
+                      <Shield className="w-4 h-4 mr-2" />
+                      Admin
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => navigate('/previous-tests')}>Previous Tests</Button>
+                  <Button variant="outline" onClick={() => navigate('/performance')}>Performance</Button>
+                  <Button variant="outline" onClick={handleSignOut}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Sign Out
+                  </Button>
+                </>
+              ) : (
+                <Button onClick={() => setShowAuthModal(true)}>
+                  Sign In / Sign Up
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -259,6 +292,8 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      <AuthModal open={showAuthModal} onOpenChange={setShowAuthModal} />
     </div>
   );
 };
