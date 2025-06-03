@@ -13,14 +13,18 @@ import {
   TrendingUp,
   Download,
   Share2,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from "lucide-react";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 const Results = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
+  const [showReviewMode, setShowReviewMode] = useState(false);
   
   const { answers, questions, timeSpent, subject } = location.state || {};
 
@@ -100,6 +104,76 @@ const Results = () => {
   const gradeInfo = getGrade(percentage);
   const timeSpentFormatted = `${Math.floor(timeSpent / 60)}m ${timeSpent % 60}s`;
 
+  const handleDownloadReport = () => {
+    const reportData = {
+      subject,
+      score: results.score,
+      maxScore: results.maxScore,
+      percentage,
+      grade: gradeInfo.grade,
+      correctAnswers: results.correctAnswers,
+      wrongAnswers: results.wrongAnswers,
+      unanswered: results.unanswered,
+      timeSpent: timeSpentFormatted,
+      date: new Date().toLocaleDateString(),
+      subjectWiseAnalysis: results.subjectWiseAnalysis
+    };
+
+    const dataStr = JSON.stringify(reportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `GATE_${subject}_Report_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Report Downloaded",
+      description: "Your test report has been downloaded successfully.",
+    });
+  };
+
+  const handleShareResults = async () => {
+    const shareText = `🎓 GATE ${subject} Mock Test Results\n\n📊 Score: ${results.score}/${results.maxScore} (${percentage}%)\n🏆 Grade: ${gradeInfo.grade}\n✅ Correct: ${results.correctAnswers}\n❌ Wrong: ${results.wrongAnswers}\n⏱️ Time: ${timeSpentFormatted}\n\nTake your GATE preparation to the next level!`;
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'GATE Test Results',
+          text: shareText,
+        });
+        toast({
+          title: "Results Shared",
+          description: "Your test results have been shared successfully.",
+        });
+      } catch (error) {
+        // Fallback to clipboard
+        navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Results Copied",
+          description: "Your test results have been copied to clipboard.",
+        });
+      }
+    } else {
+      // Fallback to clipboard
+      navigator.clipboard.writeText(shareText);
+      toast({
+        title: "Results Copied",
+        description: "Your test results have been copied to clipboard.",
+      });
+    }
+  };
+
+  const handleReviewAnswers = () => {
+    setShowReviewMode(!showReviewMode);
+    if (!showReviewMode) {
+      setShowDetailedAnalysis(true);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -118,11 +192,11 @@ const Results = () => {
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Take Another Test
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" onClick={handleDownloadReport}>
                 <Download className="w-4 h-4 mr-2" />
                 Download Report
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" onClick={handleShareResults}>
                 <Share2 className="w-4 h-4 mr-2" />
                 Share Results
               </Button>
@@ -287,17 +361,26 @@ const Results = () => {
           </CardContent>
         </Card>
 
-        {/* Detailed Analysis Toggle */}
+        {/* Review Answers Section */}
         <Card>
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
-              <span>Question-by-Question Analysis</span>
-              <Button
-                variant="outline"
-                onClick={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
-              >
-                {showDetailedAnalysis ? 'Hide Details' : 'Show Details'}
-              </Button>
+              <span>Answer Review</span>
+              <div className="flex space-x-2">
+                <Button
+                  variant={showReviewMode ? "default" : "outline"}
+                  onClick={handleReviewAnswers}
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  {showReviewMode ? 'Exit Review Mode' : 'Review Answers'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
+                >
+                  {showDetailedAnalysis ? 'Hide Details' : 'Show Details'}
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           
@@ -311,7 +394,7 @@ const Results = () => {
                   const isAnswered = !!userAnswer;
                   
                   return (
-                    <div key={questionNum} className="border rounded-lg p-4">
+                    <div key={questionNum} className={`border rounded-lg p-4 ${showReviewMode ? (isCorrect ? 'border-green-200 bg-green-50' : isAnswered ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50') : ''}`}>
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
@@ -323,6 +406,32 @@ const Results = () => {
                             <Badge variant="outline">{question.subject}</Badge>
                           </div>
                           <p className="text-sm text-gray-700 mb-2">{question.question}</p>
+                          
+                          {showReviewMode && question.options && (
+                            <div className="mt-3 space-y-2">
+                              {question.options.map((option: any, optIndex: number) => (
+                                <div 
+                                  key={optIndex} 
+                                  className={`p-2 rounded text-sm ${
+                                    option.id === question.correctAnswer 
+                                      ? 'bg-green-100 border border-green-300' 
+                                      : option.id === userAnswer && option.id !== question.correctAnswer
+                                      ? 'bg-red-100 border border-red-300'
+                                      : 'bg-gray-50'
+                                  }`}
+                                >
+                                  <span className="font-medium mr-2">({option.id})</span>
+                                  {option.text}
+                                  {option.id === question.correctAnswer && (
+                                    <span className="ml-2 text-green-600 font-medium">✓ Correct</span>
+                                  )}
+                                  {option.id === userAnswer && option.id !== question.correctAnswer && (
+                                    <span className="ml-2 text-red-600 font-medium">✗ Your Answer</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex items-center space-x-2">
@@ -369,8 +478,8 @@ const Results = () => {
           <Button size="lg" onClick={() => navigate('/')} className="mr-4">
             Take Another Test
           </Button>
-          <Button variant="outline" size="lg">
-            Review Answers
+          <Button variant="outline" size="lg" onClick={handleReviewAnswers}>
+            {showReviewMode ? 'Exit Review Mode' : 'Review Answers'}
           </Button>
         </div>
       </div>
