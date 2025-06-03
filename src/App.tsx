@@ -10,6 +10,7 @@ import PreviousTests from "./pages/PreviousTests";
 import Performance from "./pages/Performance";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "@/contexts/AuthContext";
+import Admin from "./pages/Admin";
 
 const queryClient = new QueryClient();
 
