@@ -1,70 +1,84 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BookOpen, Calendar, Clock, Award, Eye, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-// Mock data for previous tests
-const mockPreviousTests = [
-  {
-    id: 1,
-    subject: "CS",
-    subjectName: "Computer Science & IT",
-    date: "2024-05-28",
-    score: 85,
-    totalQuestions: 65,
-    correctAnswers: 55,
-    timeSpent: "2h 45m",
-    status: "Completed"
-  },
-  {
-    id: 2,
-    subject: "ME",
-    subjectName: "Mechanical Engineering",
-    date: "2024-05-25",
-    score: 78,
-    totalQuestions: 65,
-    correctAnswers: 51,
-    timeSpent: "2h 58m",
-    status: "Completed"
-  },
-  {
-    id: 3,
-    subject: "EE",
-    subjectName: "Electrical Engineering",
-    date: "2024-05-22",
-    score: 92,
-    totalQuestions: 65,
-    correctAnswers: 60,
-    timeSpent: "2h 35m",
-    status: "Completed"
-  },
-  {
-    id: 4,
-    subject: "CS",
-    subjectName: "Computer Science & IT",
-    date: "2024-05-20",
-    score: 67,
-    totalQuestions: 65,
-    correctAnswers: 44,
-    timeSpent: "3h 0m",
-    status: "Completed"
-  }
-];
+import { useAuth } from "@/contexts/AuthContext";
+import { getUserTestSessions, TestSession } from "@/services/testService";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const PreviousTests = () => {
   const navigate = useNavigate();
-  const [tests, setTests] = useState(mockPreviousTests);
+  const { user, loading } = useAuth();
+  const { toast } = useToast();
+  const [tests, setTests] = useState<TestSession[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleViewDetails = (testId: number) => {
-    navigate(`/test-details/${testId}`);
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to view your test history.",
+        variant: "destructive",
+      });
+      navigate('/');
+      return;
+    }
+  }, [user, loading, navigate, toast]);
+
+  useEffect(() => {
+    const fetchTestSessions = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoading(true);
+        const sessions = await getUserTestSessions();
+        setTests(sessions);
+      } catch (error) {
+        console.error('Error fetching test sessions:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load test history.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTestSessions();
+  }, [user, toast]);
+
+  const handleViewDetails = (testId: string) => {
+    navigate(`/results`, { state: { sessionId: testId } });
   };
 
-  const handleDeleteTest = (testId: number) => {
-    setTests(prev => prev.filter(test => test.id !== testId));
+  const handleDeleteTest = async (testId: string) => {
+    try {
+      const { error } = await supabase
+        .from('test_sessions')
+        .delete()
+        .eq('id', testId);
+
+      if (error) throw error;
+
+      setTests(prev => prev.filter(test => test.id !== testId));
+      toast({
+        title: "Success",
+        description: "Test deleted successfully.",
+      });
+    } catch (error) {
+      console.error('Error deleting test:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete test.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getScoreColor = (score: number) => {
@@ -74,9 +88,26 @@ const PreviousTests = () => {
     return "bg-red-500";
   };
 
-  const averageScore = tests.length > 0 ? Math.round(tests.reduce((sum, test) => sum + test.score, 0) / tests.length) : 0;
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-lg">Loading test history...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const averageScore = tests.length > 0 ? Math.round(tests.reduce((sum, test) => sum + (test.percentage || 0), 0) / tests.length) : 0;
   const totalTests = tests.length;
-  const bestScore = tests.length > 0 ? Math.max(...tests.map(test => test.score)) : 0;
+  const bestScore = tests.length > 0 ? Math.max(...tests.map(test => test.percentage || 0)) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -135,7 +166,7 @@ const PreviousTests = () => {
               <Award className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{bestScore}%</div>
+              <div className="text-2xl font-bold">{Math.round(bestScore)}%</div>
               <p className="text-xs text-muted-foreground">
                 Highest achievement
               </p>
@@ -172,7 +203,7 @@ const PreviousTests = () => {
                     <TableHead>Subject</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Score</TableHead>
-                    <TableHead>Correct Answers</TableHead>
+                    <TableHead>Questions Answered</TableHead>
                     <TableHead>Time Spent</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Actions</TableHead>
@@ -184,31 +215,32 @@ const PreviousTests = () => {
                       <TableCell>
                         <div>
                           <div className="font-medium">{test.subject}</div>
-                          <div className="text-sm text-gray-500">{test.subjectName}</div>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Calendar className="h-4 w-4 text-gray-400" />
-                          <span>{new Date(test.date).toLocaleDateString()}</span>
+                          <span>{new Date(test.start_time).toLocaleDateString()}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${getScoreColor(test.score)} text-white`}>
-                          {test.score}%
+                        <Badge className={`${getScoreColor(test.percentage || 0)} text-white`}>
+                          {Math.round(test.percentage || 0)}%
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {test.correctAnswers}/{test.totalQuestions}
+                        {test.answered_questions || 0}/{test.total_questions}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Clock className="h-4 w-4 text-gray-400" />
-                          <span>{test.timeSpent}</span>
+                          <span>{test.time_taken ? formatDuration(test.time_taken) : 'N/A'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{test.status}</Badge>
+                        <Badge variant="outline" className={test.status === 'completed' ? 'border-green-500 text-green-700' : ''}>
+                          {test.status}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex space-x-2">

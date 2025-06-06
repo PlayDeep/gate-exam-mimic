@@ -4,37 +4,96 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Clock, 
   Calculator, 
   Flag, 
-  CheckCircle, 
-  Circle, 
-  SkipForward,
-  AlertTriangle,
   Eye,
   EyeOff
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { QuestionPanel } from "@/components/QuestionPanel";
-import { mockQuestions } from "@/data/mockQuestions";
+import { getRandomQuestionsForTest, Question } from "@/services/questionService";
+import { createTestSession, updateTestSession, saveUserAnswer } from "@/services/testService";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Exam = () => {
   const { subject } = useParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user, loading } = useAuth();
   
   const [timeLeft, setTimeLeft] = useState(180 * 60); // 3 hours in seconds
   const [currentQuestion, setCurrentQuestion] = useState(1);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [markedForReview, setMarkedForReview] = useState<Set<number>>(new Set());
-  const [showQuestionPanel, setShowQuestionPanel] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
   
-  const questions = mockQuestions[subject as keyof typeof mockQuestions] || mockQuestions.CS;
-  const totalQuestions = questions.length;
+  const totalQuestions = Math.min(questions.length, 65);
+
+  // Check authentication
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to take the test.",
+        variant: "destructive",
+      });
+      navigate('/');
+      return;
+    }
+  }, [user, loading, navigate, toast]);
+
+  // Load questions and create test session
+  useEffect(() => {
+    const initializeTest = async () => {
+      if (!subject || !user) return;
+      
+      try {
+        setIsLoading(true);
+        
+        // Get random questions for this subject
+        const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
+        
+        if (fetchedQuestions.length === 0) {
+          toast({
+            title: "No Questions Available",
+            description: "No questions found for this subject. Please contact administrator.",
+            variant: "destructive",
+          });
+          navigate('/');
+          return;
+        }
+        
+        setQuestions(fetchedQuestions);
+        
+        // Create test session
+        const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
+        setSessionId(newSessionId);
+        
+      } catch (error) {
+        console.error('Error initializing test:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load test questions. Please try again.",
+          variant: "destructive",
+        });
+        navigate('/');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeTest();
+  }, [subject, user, navigate, toast]);
 
   // Timer effect
   useEffect(() => {
+    if (isLoading) return;
+    
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -46,7 +105,7 @@ const Exam = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [isLoading]);
 
   // Fullscreen effect
   useEffect(() => {
@@ -65,8 +124,28 @@ const Exam = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleAnswerChange = (questionId: number, answer: string) => {
+  const handleAnswerChange = async (questionId: number, answer: string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    
+    // Save answer to database
+    if (sessionId && questions[questionId - 1]) {
+      const question = questions[questionId - 1];
+      const isCorrect = answer === question.correct_answer;
+      const marksAwarded = isCorrect ? question.marks : -(question.negative_marks || 0);
+      
+      try {
+        await saveUserAnswer(
+          sessionId,
+          question.id,
+          answer,
+          isCorrect,
+          marksAwarded,
+          30 // Default time spent, you can track this more accurately
+        );
+      } catch (error) {
+        console.error('Error saving answer:', error);
+      }
+    }
   };
 
   const handleMarkForReview = (questionId: number) => {
@@ -81,15 +160,58 @@ const Exam = () => {
     });
   };
 
-  const handleSubmitExam = () => {
-    navigate('/results', { 
-      state: { 
-        answers, 
-        questions, 
-        timeSpent: (180 * 60) - timeLeft,
-        subject
-      } 
-    });
+  const handleSubmitExam = async () => {
+    if (!sessionId) return;
+    
+    try {
+      const timeSpentMinutes = Math.floor((180 * 60 - timeLeft) / 60);
+      const answeredCount = Object.keys(answers).length;
+      
+      // Calculate score
+      let totalScore = 0;
+      let correctAnswers = 0;
+      
+      Object.entries(answers).forEach(([questionIndex, answer]) => {
+        const question = questions[parseInt(questionIndex) - 1];
+        if (question && answer === question.correct_answer) {
+          totalScore += question.marks;
+          correctAnswers++;
+        } else if (question && answer !== question.correct_answer) {
+          totalScore -= (question.negative_marks || 0);
+        }
+      });
+      
+      const percentage = (correctAnswers / totalQuestions) * 100;
+      
+      // Update test session
+      await updateTestSession(sessionId, {
+        end_time: new Date().toISOString(),
+        answered_questions: answeredCount,
+        score: totalScore,
+        percentage: percentage,
+        status: 'completed',
+        time_taken: timeSpentMinutes
+      });
+      
+      navigate('/results', { 
+        state: { 
+          sessionId,
+          answers, 
+          questions, 
+          timeSpent: timeSpentMinutes,
+          subject,
+          score: totalScore,
+          percentage: percentage
+        } 
+      });
+    } catch (error) {
+      console.error('Error submitting exam:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit exam. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleFullscreen = () => {
@@ -123,10 +245,32 @@ const Exam = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-lg">Loading test questions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">No Questions Available</h2>
+          <p className="mb-4">No questions found for this subject.</p>
+          <Button onClick={() => navigate('/')}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+
   const answeredCount = Object.keys(answers).length;
   const markedCount = markedForReview.size;
   const notAnsweredCount = totalQuestions - answeredCount;
-
   const currentQuestionData = questions[currentQuestion - 1];
 
   return (
@@ -185,8 +329,8 @@ const Exam = () => {
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="flex items-center space-x-2 mb-4">
-                          <Badge variant={currentQuestionData.type === 'MCQ' ? 'default' : 'secondary'}>
-                            {currentQuestionData.type}
+                          <Badge variant={currentQuestionData.question_type === 'MCQ' ? 'default' : 'secondary'}>
+                            {currentQuestionData.question_type}
                           </Badge>
                           <Badge variant="outline">
                             {currentQuestionData.marks} Mark{currentQuestionData.marks > 1 ? 's' : ''}
@@ -201,13 +345,13 @@ const Exam = () => {
                         </h2>
                         
                         <div className="prose prose-lg max-w-none mb-6">
-                          <p>{currentQuestionData.question}</p>
+                          <p>{currentQuestionData.question_text}</p>
                         </div>
 
                         {/* Options for MCQ */}
-                        {currentQuestionData.type === 'MCQ' && (
+                        {currentQuestionData.question_type === 'MCQ' && currentQuestionData.options && (
                           <div className="space-y-3">
-                            {currentQuestionData.options?.map((option, index) => (
+                            {currentQuestionData.options.map((option, index) => (
                               <div
                                 key={index}
                                 className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
@@ -231,7 +375,7 @@ const Exam = () => {
                         )}
 
                         {/* Input for NAT */}
-                        {currentQuestionData.type === 'NAT' && (
+                        {currentQuestionData.question_type === 'NAT' && (
                           <div className="space-y-3">
                             <label className="block text-sm font-medium text-gray-700">
                               Enter your numerical answer:
