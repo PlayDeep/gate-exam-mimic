@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Clock, Users, Award, LogOut, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { AuthModal } from "@/components/auth/AuthModal";
+import AuthModal from "@/components/auth/AuthModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllSubjects } from "@/services/questionService";
 import { supabase } from "@/integrations/supabase/client";
@@ -263,8 +263,8 @@ const Index = () => {
       </div>
 
       <AuthModal 
-        isOpen={showAuthModal} 
-        onClose={() => setShowAuthModal(false)} 
+        open={showAuthModal} 
+        onOpenChange={setShowAuthModal} 
       />
     </div>
   );

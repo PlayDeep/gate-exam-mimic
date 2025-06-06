@@ -26,9 +26,16 @@ export interface UserAnswer {
 }
 
 export const createTestSession = async (subject: string, totalQuestions: number): Promise<string> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
   const { data, error } = await supabase
     .from('test_sessions')
     .insert({
+      user_id: user.id,
       subject,
       total_questions: totalQuestions,
       status: 'in_progress'
