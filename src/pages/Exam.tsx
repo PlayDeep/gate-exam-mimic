@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -32,7 +31,7 @@ const Exam = () => {
   const [sessionId, setSessionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   
-  const totalQuestions = Math.min(questions.length, 65);
+  const totalQuestions = questions.length > 0 ? Math.min(questions.length, 65) : 0;
 
   // Check authentication
   useEffect(() => {
@@ -181,7 +180,7 @@ const Exam = () => {
         }
       });
       
-      const percentage = (correctAnswers / totalQuestions) * 100;
+      const percentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
       
       // Update test session
       await updateTestSession(sessionId, {
@@ -242,6 +241,18 @@ const Exam = () => {
       case 'marked': return 'bg-purple-500';
       case 'answered-marked': return 'bg-blue-500';
       default: return 'bg-red-500';
+    }
+  };
+
+  const handleNext = () => {
+    if (currentQuestion < totalQuestions) {
+      setCurrentQuestion(prev => prev + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestion > 1) {
+      setCurrentQuestion(prev => prev - 1);
     }
   };
 
@@ -429,15 +440,15 @@ const Exam = () => {
                 <Button
                   variant="outline"
                   disabled={currentQuestion === 1}
-                  onClick={() => setCurrentQuestion(prev => Math.max(1, prev - 1))}
+                  onClick={handlePrevious}
                 >
                   Previous
                 </Button>
                 
                 <Button
                   variant="outline"
-                  disabled={currentQuestion === totalQuestions}
-                  onClick={() => setCurrentQuestion(prev => Math.min(totalQuestions, prev + 1))}
+                  disabled={currentQuestion === totalQuestions || totalQuestions === 0}
+                  onClick={handleNext}
                 >
                   Next
                 </Button>
@@ -457,7 +468,7 @@ const Exam = () => {
                 <span>Progress</span>
                 <span>{answeredCount}/{totalQuestions}</span>
               </div>
-              <Progress value={(answeredCount / totalQuestions) * 100} />
+              <Progress value={totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0} />
             </div>
 
             {/* Status Legend */}
