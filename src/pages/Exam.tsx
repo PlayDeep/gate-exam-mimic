@@ -296,6 +296,7 @@ const Exam = () => {
   const currentQuestionData = questions[currentQuestion - 1];
 
   console.log('Render - Current question:', currentQuestion, 'Total questions:', totalQuestions, 'Questions length:', questions.length);
+  console.log('Current question data:', currentQuestionData);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -375,26 +376,39 @@ const Exam = () => {
                         {/* Options for MCQ */}
                         {currentQuestionData.question_type === 'MCQ' && currentQuestionData.options && (
                           <div className="space-y-3">
-                            {currentQuestionData.options.map((option, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                                onClick={() => handleAnswerChange(currentQuestion, option.id)}
-                              >
-                                <input
-                                  type="radio"
-                                  name={`question-${currentQuestion}`}
-                                  value={option.id}
-                                  checked={answers[currentQuestion] === option.id}
-                                  onChange={() => handleAnswerChange(currentQuestion, option.id)}
-                                  className="w-4 h-4"
-                                />
-                                <label className="flex-1 cursor-pointer">
-                                  <span className="font-medium mr-2">({option.id})</span>
-                                  {option.text}
-                                </label>
-                              </div>
-                            ))}
+                            {Array.isArray(currentQuestionData.options) && currentQuestionData.options.map((option, index) => {
+                              // Handle both string and object options
+                              const optionId = typeof option === 'string' ? option : option.id;
+                              const optionText = typeof option === 'string' ? option : option.text;
+                              
+                              return (
+                                <div
+                                  key={index}
+                                  className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                                  onClick={() => handleAnswerChange(currentQuestion, optionId)}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`question-${currentQuestion}`}
+                                    value={optionId}
+                                    checked={answers[currentQuestion] === optionId}
+                                    onChange={() => handleAnswerChange(currentQuestion, optionId)}
+                                    className="w-4 h-4"
+                                  />
+                                  <label className="flex-1 cursor-pointer">
+                                    <span className="font-medium mr-2">({optionId})</span>
+                                    {optionText}
+                                  </label>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Debug info for MCQ options */}
+                        {currentQuestionData.question_type === 'MCQ' && (
+                          <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
+                            <strong>Debug - Options:</strong> {JSON.stringify(currentQuestionData.options)}
                           </div>
                         )}
 
