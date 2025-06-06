@@ -124,6 +124,7 @@ const Exam = () => {
   };
 
   const handleAnswerChange = async (questionId: number, answer: string) => {
+    console.log('Answer changed for question:', questionId, 'Answer:', answer);
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     
     // Save answer to database
@@ -245,14 +246,24 @@ const Exam = () => {
   };
 
   const handleNext = () => {
-    if (currentQuestion < totalQuestions) {
-      setCurrentQuestion(prev => prev + 1);
+    console.log('Next clicked. Current question:', currentQuestion, 'Total questions:', totalQuestions);
+    if (!isLoading && totalQuestions > 0 && currentQuestion < totalQuestions) {
+      const nextQuestion = currentQuestion + 1;
+      console.log('Moving to question:', nextQuestion);
+      setCurrentQuestion(nextQuestion);
+    } else {
+      console.log('Cannot move to next question. Loading:', isLoading, 'Total:', totalQuestions, 'Current:', currentQuestion);
     }
   };
 
   const handlePrevious = () => {
-    if (currentQuestion > 1) {
-      setCurrentQuestion(prev => prev - 1);
+    console.log('Previous clicked. Current question:', currentQuestion);
+    if (!isLoading && currentQuestion > 1) {
+      const prevQuestion = currentQuestion - 1;
+      console.log('Moving to question:', prevQuestion);
+      setCurrentQuestion(prevQuestion);
+    } else {
+      console.log('Cannot move to previous question. Loading:', isLoading, 'Current:', currentQuestion);
     }
   };
 
@@ -283,6 +294,8 @@ const Exam = () => {
   const markedCount = markedForReview.size;
   const notAnsweredCount = totalQuestions - answeredCount;
   const currentQuestionData = questions[currentQuestion - 1];
+
+  console.log('Render - Current question:', currentQuestion, 'Total questions:', totalQuestions, 'Questions length:', questions.length);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -439,7 +452,7 @@ const Exam = () => {
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
-                  disabled={currentQuestion === 1}
+                  disabled={currentQuestion === 1 || isLoading}
                   onClick={handlePrevious}
                 >
                   Previous
@@ -447,7 +460,7 @@ const Exam = () => {
                 
                 <Button
                   variant="outline"
-                  disabled={currentQuestion === totalQuestions || totalQuestions === 0}
+                  disabled={currentQuestion >= totalQuestions || totalQuestions === 0 || isLoading}
                   onClick={handleNext}
                 >
                   Next
@@ -502,7 +515,10 @@ const Exam = () => {
                 return (
                   <button
                     key={questionNum}
-                    onClick={() => setCurrentQuestion(questionNum)}
+                    onClick={() => {
+                      console.log('Question grid clicked:', questionNum);
+                      setCurrentQuestion(questionNum);
+                    }}
                     className={`
                       w-10 h-10 rounded text-white text-sm font-medium
                       ${isCurrent ? 'ring-2 ring-gray-400' : ''}
