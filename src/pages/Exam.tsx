@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -125,13 +126,18 @@ const Exam = () => {
 
   const handleAnswerChange = async (questionId: number, answer: string) => {
     console.log('Answer changed for question:', questionId, 'Answer:', answer);
+    console.log('Current question data:', questions[questionId - 1]);
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     
     // Save answer to database
     if (sessionId && questions[questionId - 1]) {
       const question = questions[questionId - 1];
+      console.log('Question correct answer:', question.correct_answer);
+      console.log('User answer:', answer);
       const isCorrect = answer === question.correct_answer;
+      console.log('Is correct:', isCorrect);
       const marksAwarded = isCorrect ? question.marks : -(question.negative_marks || 0);
+      console.log('Marks awarded:', marksAwarded);
       
       try {
         await saveUserAnswer(
@@ -167,21 +173,46 @@ const Exam = () => {
       const timeSpentMinutes = Math.floor((180 * 60 - timeLeft) / 60);
       const answeredCount = Object.keys(answers).length;
       
-      // Calculate score
+      // Calculate score with detailed logging
       let totalScore = 0;
       let correctAnswers = 0;
       
+      console.log('Starting score calculation...');
+      console.log('Total answers:', answers);
+      console.log('Total questions:', questions.length);
+      
       Object.entries(answers).forEach(([questionIndex, answer]) => {
         const question = questions[parseInt(questionIndex) - 1];
+        console.log(`Question ${questionIndex}:`, {
+          question: question?.question_text?.substring(0, 50) + '...',
+          userAnswer: answer,
+          correctAnswer: question?.correct_answer,
+          marks: question?.marks,
+          negativeMarks: question?.negative_marks
+        });
+        
         if (question && answer === question.correct_answer) {
           totalScore += question.marks;
           correctAnswers++;
-        } else if (question && answer !== question.correct_answer) {
-          totalScore -= (question.negative_marks || 0);
+          console.log(`✅ Correct! Added ${question.marks} marks. Total: ${totalScore}`);
+        } else if (question && answer && answer !== question.correct_answer) {
+          const penalty = question.negative_marks || 0;
+          totalScore -= penalty;
+          console.log(`❌ Wrong! Deducted ${penalty} marks. Total: ${totalScore}`);
+        } else {
+          console.log(`⏭️ Not answered`);
         }
       });
       
       const percentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+      
+      console.log('Final calculation:', {
+        totalScore,
+        correctAnswers,
+        totalQuestions,
+        percentage,
+        answeredCount
+      });
       
       // Update test session
       await updateTestSession(sessionId, {
@@ -375,26 +406,50 @@ const Exam = () => {
                         {/* Options for MCQ */}
                         {currentQuestionData.question_type === 'MCQ' && currentQuestionData.options && (
                           <div className="space-y-3">
-                            {Object.entries(currentQuestionData.options as Record<string, string>).map(([key, value]) => (
-                              <div
-                                key={key}
-                                className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                                onClick={() => handleAnswerChange(currentQuestion, key)}
-                              >
-                                <input
-                                  type="radio"
-                                  name={`question-${currentQuestion}`}
-                                  value={key}
-                                  checked={answers[currentQuestion] === key}
-                                  onChange={() => handleAnswerChange(currentQuestion, key)}
-                                  className="w-4 h-4"
-                                />
-                                <label className="flex-1 cursor-pointer">
-                                  <span className="font-medium mr-2">({key})</span>
-                                  {value}
-                                </label>
-                              </div>
-                            ))}
+                            {(() => {
+                              // Handle different option formats
+                              let optionsToRender: Array<{id: string, text: string}> = [];
+                              
+                              if (Array.isArray(currentQuestionData.options)) {
+                                // If it's already an array of objects with id and text
+                                if (currentQuestionData.options.length > 0 && typeof currentQuestionData.options[0] === 'object' && 'id' in currentQuestionData.options[0]) {
+                                  optionsToRender = currentQuestionData.options as Array<{id: string, text: string}>;
+                                } else {
+                                  // If it's an array of strings, convert to objects
+                                  optionsToRender = (currentQuestionData.options as string[]).map((option, index) => ({
+                                    id: String.fromCharCode(65 + index), // A, B, C, D
+                                    text: option
+                                  }));
+                                }
+                              } else if (typeof currentQuestionData.options === 'object') {
+                                // If it's an object, convert to array
+                                optionsToRender = Object.entries(currentQuestionData.options).map(([key, value]) => ({
+                                  id: key,
+                                  text: String(value)
+                                }));
+                              }
+
+                              return optionsToRender.map(option => (
+                                <div
+                                  key={option.id}
+                                  className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                                  onClick={() => handleAnswerChange(currentQuestion, option.id)}
+                                >
+                                  <input
+                                    type="radio"
+                                    name={`question-${currentQuestion}`}
+                                    value={option.id}
+                                    checked={answers[currentQuestion] === option.id}
+                                    onChange={() => handleAnswerChange(currentQuestion, option.id)}
+                                    className="w-4 h-4"
+                                  />
+                                  <label className="flex-1 cursor-pointer">
+                                    <span className="font-medium mr-2">({option.id})</span>
+                                    {option.text}
+                                  </label>
+                                </div>
+                              ));
+                            })()}
                           </div>
                         )}
 
