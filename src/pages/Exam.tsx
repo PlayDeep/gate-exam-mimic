@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -69,6 +68,7 @@ const Exam = () => {
         }
         
         setQuestions(fetchedQuestions);
+        console.log('Loaded questions:', fetchedQuestions.map(q => ({ id: q.id, correct_answer: q.correct_answer, question_type: q.question_type })));
         
         // Create test session
         const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
@@ -125,19 +125,46 @@ const Exam = () => {
   };
 
   const handleAnswerChange = async (questionId: number, answer: string) => {
-    console.log('Answer changed for question:', questionId, 'Answer:', answer);
-    console.log('Current question data:', questions[questionId - 1]);
+    console.log('=== ANSWER CHANGE START ===');
+    console.log('Question ID:', questionId);
+    console.log('User Answer:', answer);
+    console.log('Answer Type:', typeof answer);
+    
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     
     // Save answer to database
     if (sessionId && questions[questionId - 1]) {
       const question = questions[questionId - 1];
-      console.log('Question correct answer:', question.correct_answer);
-      console.log('User answer:', answer);
-      const isCorrect = answer === question.correct_answer;
-      console.log('Is correct:', isCorrect);
-      const marksAwarded = isCorrect ? question.marks : -(question.negative_marks || 0);
-      console.log('Marks awarded:', marksAwarded);
+      console.log('Question Data:', {
+        id: question.id,
+        correct_answer: question.correct_answer,
+        correct_answer_type: typeof question.correct_answer,
+        question_type: question.question_type,
+        marks: question.marks,
+        negative_marks: question.negative_marks
+      });
+      
+      // Normalize both answers for comparison - convert to strings and trim
+      const normalizedUserAnswer = String(answer).trim();
+      const normalizedCorrectAnswer = String(question.correct_answer).trim();
+      
+      console.log('Normalized User Answer:', normalizedUserAnswer);
+      console.log('Normalized Correct Answer:', normalizedCorrectAnswer);
+      
+      const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
+      console.log('Is Correct:', isCorrect);
+      
+      let marksAwarded = 0;
+      if (isCorrect) {
+        marksAwarded = question.marks;
+      } else if (question.question_type === 'MCQ') {
+        // Apply negative marking for MCQ
+        marksAwarded = -(question.negative_marks || 0);
+      }
+      // NAT questions don't have negative marking
+      
+      console.log('Marks Awarded:', marksAwarded);
+      console.log('=== ANSWER CHANGE END ===');
       
       try {
         await saveUserAnswer(
@@ -176,43 +203,70 @@ const Exam = () => {
       // Calculate score with detailed logging
       let totalScore = 0;
       let correctAnswers = 0;
+      let wrongAnswers = 0;
+      let unansweredCount = 0;
       
-      console.log('Starting score calculation...');
-      console.log('Total answers:', answers);
+      console.log('=== FINAL SCORE CALCULATION START ===');
+      console.log('Total answers provided:', Object.keys(answers).length);
       console.log('Total questions:', questions.length);
+      console.log('Answers object:', answers);
       
-      Object.entries(answers).forEach(([questionIndex, answer]) => {
-        const question = questions[parseInt(questionIndex) - 1];
-        console.log(`Question ${questionIndex}:`, {
-          question: question?.question_text?.substring(0, 50) + '...',
-          userAnswer: answer,
-          correctAnswer: question?.correct_answer,
-          marks: question?.marks,
-          negativeMarks: question?.negative_marks
-        });
+      // Process each question
+      questions.forEach((question, index) => {
+        const questionNum = index + 1;
+        const userAnswer = answers[questionNum];
         
-        if (question && answer === question.correct_answer) {
-          totalScore += question.marks;
+        console.log(`\n--- Question ${questionNum} ---`);
+        console.log('Question ID:', question.id);
+        console.log('Question Type:', question.question_type);
+        console.log('User Answer:', userAnswer);
+        console.log('Correct Answer:', question.correct_answer);
+        console.log('Marks:', question.marks);
+        console.log('Negative Marks:', question.negative_marks);
+        
+        if (!userAnswer || userAnswer === '') {
+          unansweredCount++;
+          console.log('Status: UNANSWERED');
+          return;
+        }
+        
+        // Normalize both answers for comparison
+        const normalizedUserAnswer = String(userAnswer).trim();
+        const normalizedCorrectAnswer = String(question.correct_answer).trim();
+        
+        console.log('Normalized User Answer:', normalizedUserAnswer);
+        console.log('Normalized Correct Answer:', normalizedCorrectAnswer);
+        
+        const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
+        console.log('Is Correct:', isCorrect);
+        
+        if (isCorrect) {
           correctAnswers++;
-          console.log(`✅ Correct! Added ${question.marks} marks. Total: ${totalScore}`);
-        } else if (question && answer && answer !== question.correct_answer) {
-          const penalty = question.negative_marks || 0;
-          totalScore -= penalty;
-          console.log(`❌ Wrong! Deducted ${penalty} marks. Total: ${totalScore}`);
+          totalScore += question.marks;
+          console.log(`Status: CORRECT - Added ${question.marks} marks. Running total: ${totalScore}`);
         } else {
-          console.log(`⏭️ Not answered`);
+          wrongAnswers++;
+          if (question.question_type === 'MCQ') {
+            const penalty = question.negative_marks || 0;
+            totalScore -= penalty;
+            console.log(`Status: WRONG (MCQ) - Deducted ${penalty} marks. Running total: ${totalScore}`);
+          } else {
+            console.log(`Status: WRONG (NAT) - No penalty. Running total: ${totalScore}`);
+          }
         }
       });
       
       const percentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
       
-      console.log('Final calculation:', {
-        totalScore,
-        correctAnswers,
-        totalQuestions,
-        percentage,
-        answeredCount
-      });
+      console.log('\n=== FINAL RESULTS ===');
+      console.log('Total Score:', totalScore);
+      console.log('Correct Answers:', correctAnswers);
+      console.log('Wrong Answers:', wrongAnswers);
+      console.log('Unanswered:', unansweredCount);
+      console.log('Total Questions:', totalQuestions);
+      console.log('Percentage:', percentage);
+      console.log('Answered Count:', answeredCount);
+      console.log('=== FINAL SCORE CALCULATION END ===');
       
       // Update test session
       await updateTestSession(sessionId, {
@@ -302,27 +356,37 @@ const Exam = () => {
   const parseOptions = (options: any): Array<{id: string, text: string}> => {
     if (!options) return [];
     
+    console.log('Parsing options:', options, 'Type:', typeof options);
+    
     // If it's already an array of objects with id and text
     if (Array.isArray(options) && options.length > 0 && typeof options[0] === 'object' && 'id' in options[0]) {
+      console.log('Options are already in correct format');
       return options as Array<{id: string, text: string}>;
     }
     
     // If it's an array of strings, convert to objects
     if (Array.isArray(options)) {
-      return (options as string[]).map((option, index) => ({
+      console.log('Converting string array to options format');
+      const converted = options.map((option, index) => ({
         id: String.fromCharCode(65 + index), // A, B, C, D
-        text: option
+        text: String(option)
       }));
+      console.log('Converted options:', converted);
+      return converted;
     }
     
     // If it's an object, convert to array
     if (typeof options === 'object') {
-      return Object.entries(options).map(([key, value]) => ({
+      console.log('Converting object to options format');
+      const converted = Object.entries(options).map(([key, value]) => ({
         id: key,
         text: String(value)
       }));
+      console.log('Converted options:', converted);
+      return converted;
     }
     
+    console.log('Could not parse options, returning empty array');
     return [];
   };
 
