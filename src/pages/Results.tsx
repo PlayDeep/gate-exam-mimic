@@ -1,4 +1,3 @@
-
 import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,71 +25,136 @@ const Results = () => {
   const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
   const [showReviewMode, setShowReviewMode] = useState(false);
   
-  const { answers, questions, timeSpent, subject } = location.state || {};
+  const { answers, questions, timeSpent, subject, score: passedScore, percentage: passedPercentage } = location.state || {};
 
   if (!answers || !questions) {
     navigate('/');
     return null;
   }
 
+  // Use passed score if available, otherwise calculate
+  const usePassedScore = passedScore !== undefined && passedPercentage !== undefined;
+
   // Calculate results
   const calculateResults = () => {
-    let score = 0;
-    let correctAnswers = 0;
-    let wrongAnswers = 0;
-    let unanswered = 0;
-    const subjectWiseAnalysis: Record<string, any> = {};
+    if (usePassedScore) {
+      // Use the score calculated from the exam page
+      let correctAnswers = 0;
+      let wrongAnswers = 0;
+      let unanswered = 0;
+      const subjectWiseAnalysis: Record<string, any> = {};
 
-    questions.forEach((question: any, index: number) => {
-      const questionNum = index + 1;
-      const userAnswer = answers[questionNum];
-      const isCorrect = userAnswer === question.correctAnswer;
-      
-      // Initialize subject analysis
-      if (!subjectWiseAnalysis[question.subject]) {
-        subjectWiseAnalysis[question.subject] = {
-          total: 0,
-          correct: 0,
-          wrong: 0,
-          unanswered: 0,
-          score: 0
-        };
-      }
-      
-      subjectWiseAnalysis[question.subject].total++;
-
-      if (!userAnswer) {
-        unanswered++;
-        subjectWiseAnalysis[question.subject].unanswered++;
-      } else if (isCorrect) {
-        correctAnswers++;
-        score += question.marks;
-        subjectWiseAnalysis[question.subject].correct++;
-        subjectWiseAnalysis[question.subject].score += question.marks;
-      } else {
-        wrongAnswers++;
-        if (question.type === 'MCQ') {
-          const negativeMarks = question.marks === 1 ? -1/3 : -2/3;
-          score += negativeMarks;
-          subjectWiseAnalysis[question.subject].score += negativeMarks;
+      questions.forEach((question: any, index: number) => {
+        const questionNum = index + 1;
+        const userAnswer = answers[questionNum];
+        
+        // Normalize answers for comparison
+        const normalizedUserAnswer = userAnswer ? String(userAnswer).trim() : '';
+        const normalizedCorrectAnswer = String(question.correct_answer || question.correctAnswer).trim();
+        const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
+        
+        // Initialize subject analysis
+        if (!subjectWiseAnalysis[question.subject]) {
+          subjectWiseAnalysis[question.subject] = {
+            total: 0,
+            correct: 0,
+            wrong: 0,
+            unanswered: 0,
+            score: 0
+          };
         }
-        subjectWiseAnalysis[question.subject].wrong++;
-      }
-    });
+        
+        subjectWiseAnalysis[question.subject].total++;
 
-    return {
-      score: Math.round(score * 100) / 100,
-      correctAnswers,
-      wrongAnswers,
-      unanswered,
-      totalQuestions: questions.length,
-      maxScore: questions.reduce((sum: number, q: any) => sum + q.marks, 0),
-      subjectWiseAnalysis
-    };
+        if (!userAnswer) {
+          unanswered++;
+          subjectWiseAnalysis[question.subject].unanswered++;
+        } else if (isCorrect) {
+          correctAnswers++;
+          subjectWiseAnalysis[question.subject].correct++;
+          subjectWiseAnalysis[question.subject].score += question.marks;
+        } else {
+          wrongAnswers++;
+          subjectWiseAnalysis[question.subject].wrong++;
+          if (question.question_type === 'MCQ') {
+            const negativeMarks = question.negative_marks || (question.marks === 1 ? 1/3 : 2/3);
+            subjectWiseAnalysis[question.subject].score -= negativeMarks;
+          }
+        }
+      });
+
+      return {
+        score: passedScore,
+        correctAnswers,
+        wrongAnswers,
+        unanswered,
+        totalQuestions: questions.length,
+        maxScore: questions.reduce((sum: number, q: any) => sum + q.marks, 0),
+        subjectWiseAnalysis
+      };
+    } else {
+      // Fallback calculation (original logic)
+      let score = 0;
+      let correctAnswers = 0;
+      let wrongAnswers = 0;
+      let unanswered = 0;
+      const subjectWiseAnalysis: Record<string, any> = {};
+
+      questions.forEach((question: any, index: number) => {
+        const questionNum = index + 1;
+        const userAnswer = answers[questionNum];
+        
+        // Normalize answers for comparison
+        const normalizedUserAnswer = userAnswer ? String(userAnswer).trim() : '';
+        const normalizedCorrectAnswer = String(question.correct_answer || question.correctAnswer).trim();
+        const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
+        
+        // Initialize subject analysis
+        if (!subjectWiseAnalysis[question.subject]) {
+          subjectWiseAnalysis[question.subject] = {
+            total: 0,
+            correct: 0,
+            wrong: 0,
+            unanswered: 0,
+            score: 0
+          };
+        }
+        
+        subjectWiseAnalysis[question.subject].total++;
+
+        if (!userAnswer) {
+          unanswered++;
+          subjectWiseAnalysis[question.subject].unanswered++;
+        } else if (isCorrect) {
+          correctAnswers++;
+          score += question.marks;
+          subjectWiseAnalysis[question.subject].correct++;
+          subjectWiseAnalysis[question.subject].score += question.marks;
+        } else {
+          wrongAnswers++;
+          if (question.question_type === 'MCQ') {
+            const negativeMarks = question.negative_marks || (question.marks === 1 ? 1/3 : 2/3);
+            score -= negativeMarks;
+            subjectWiseAnalysis[question.subject].score -= negativeMarks;
+          }
+          subjectWiseAnalysis[question.subject].wrong++;
+        }
+      });
+
+      return {
+        score: Math.round(score * 100) / 100,
+        correctAnswers,
+        wrongAnswers,
+        unanswered,
+        totalQuestions: questions.length,
+        maxScore: questions.reduce((sum: number, q: any) => sum + q.marks, 0),
+        subjectWiseAnalysis
+      };
+    }
   };
 
   const results = calculateResults();
-  const percentage = Math.round((results.score / results.maxScore) * 100);
+  const percentage = usePassedScore ? passedPercentage : Math.round((results.score / results.maxScore) * 100);
   
   const getGrade = (percentage: number) => {
     if (percentage >= 85) return { grade: 'A+', color: 'text-green-600', description: 'Excellent' };
@@ -169,9 +233,36 @@ const Results = () => {
 
   const handleReviewAnswers = () => {
     setShowReviewMode(!showReviewMode);
-    if (!showReviewMode) {
-      setShowDetailedAnalysis(true);
+    // Don't automatically show detailed analysis when entering review mode
+    // Let user control it separately
+  };
+
+  // Helper function to parse options for display
+  const parseOptionsForDisplay = (options: any): Array<{id: string, text: string}> => {
+    if (!options) return [];
+    
+    // If it's already an array of objects with id and text
+    if (Array.isArray(options) && options.length > 0 && typeof options[0] === 'object' && 'id' in options[0]) {
+      return options as Array<{id: string, text: string}>;
     }
+    
+    // If it's an array of strings, convert to objects
+    if (Array.isArray(options)) {
+      return options.map((option, index) => ({
+        id: String.fromCharCode(65 + index), // A, B, C, D
+        text: String(option)
+      }));
+    }
+    
+    // If it's an object, convert to array
+    if (typeof options === 'object') {
+      return Object.entries(options).map(([key, value]) => ({
+        id: key,
+        text: String(value)
+      }));
+    }
+    
+    return [];
   };
 
   return (
@@ -390,7 +481,11 @@ const Results = () => {
                 {questions.map((question: any, index: number) => {
                   const questionNum = index + 1;
                   const userAnswer = answers[questionNum];
-                  const isCorrect = userAnswer === question.correctAnswer;
+                  
+                  // Normalize answers for comparison
+                  const normalizedUserAnswer = userAnswer ? String(userAnswer).trim() : '';
+                  const normalizedCorrectAnswer = String(question.correct_answer || question.correctAnswer).trim();
+                  const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
                   const isAnswered = !!userAnswer;
                   
                   return (
@@ -399,33 +494,33 @@ const Results = () => {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <Badge variant="outline">Q{questionNum}</Badge>
-                            <Badge variant={question.type === 'MCQ' ? 'default' : 'secondary'}>
-                              {question.type}
+                            <Badge variant={question.question_type === 'MCQ' ? 'default' : 'secondary'}>
+                              {question.question_type}
                             </Badge>
                             <Badge variant="outline">{question.marks} marks</Badge>
                             <Badge variant="outline">{question.subject}</Badge>
                           </div>
-                          <p className="text-sm text-gray-700 mb-2">{question.question}</p>
+                          <p className="text-sm text-gray-700 mb-2">{question.question_text}</p>
                           
-                          {showReviewMode && question.options && (
+                          {showReviewMode && question.options && question.question_type === 'MCQ' && (
                             <div className="mt-3 space-y-2">
-                              {question.options.map((option: any, optIndex: number) => (
+                              {parseOptionsForDisplay(question.options).map((option: any, optIndex: number) => (
                                 <div 
                                   key={optIndex} 
                                   className={`p-2 rounded text-sm ${
-                                    option.id === question.correctAnswer 
+                                    option.id === normalizedCorrectAnswer 
                                       ? 'bg-green-100 border border-green-300' 
-                                      : option.id === userAnswer && option.id !== question.correctAnswer
+                                      : option.id === userAnswer && option.id !== normalizedCorrectAnswer
                                       ? 'bg-red-100 border border-red-300'
                                       : 'bg-gray-50'
                                   }`}
                                 >
                                   <span className="font-medium mr-2">({option.id})</span>
                                   {option.text}
-                                  {option.id === question.correctAnswer && (
+                                  {option.id === normalizedCorrectAnswer && (
                                     <span className="ml-2 text-green-600 font-medium">✓ Correct</span>
                                   )}
-                                  {option.id === userAnswer && option.id !== question.correctAnswer && (
+                                  {option.id === userAnswer && option.id !== normalizedCorrectAnswer && (
                                     <span className="ml-2 text-red-600 font-medium">✗ Your Answer</span>
                                   )}
                                 </div>
@@ -456,12 +551,18 @@ const Results = () => {
                         </div>
                         <div>
                           <span className="font-medium text-gray-600">Correct Answer: </span>
-                          <span className="text-green-600">{question.correctAnswer}</span>
+                          <span className="text-green-600">{normalizedCorrectAnswer}</span>
                         </div>
                         <div>
                           <span className="font-medium text-gray-600">Score: </span>
                           <span className={isCorrect ? 'text-green-600' : 'text-red-600'}>
-                            {isAnswered ? (isCorrect ? `+${question.marks}` : (question.type === 'MCQ' ? (question.marks === 1 ? '-0.33' : '-0.67') : '0')) : '0'}
+                            {isAnswered ? (
+                              isCorrect ? `+${question.marks}` : (
+                                question.question_type === 'MCQ' ? 
+                                  `-(${question.negative_marks || (question.marks === 1 ? '0.33' : '0.67')})` : 
+                                  '0'
+                              )
+                            ) : '0'}
                           </span>
                         </div>
                       </div>
