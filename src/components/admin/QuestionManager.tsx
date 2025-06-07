@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 import { Plus, Edit, Trash2 } from 'lucide-react';
+import ExcelQuestionUpload from './ExcelQuestionUpload';
 
 interface Question {
   id: string;
@@ -353,61 +354,74 @@ const QuestionManager: React.FC = () => {
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Questions ({questions.length})</CardTitle>
-          <CardDescription>Manage all test questions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {questions.map((question) => (
-              <div key={question.id} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-sm font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                        {question.subject}
-                      </span>
-                      <span className="text-sm bg-gray-100 text-gray-800 px-2 py-1 rounded">
-                        {question.question_type}
-                      </span>
-                      <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
-                        {question.marks} marks
-                      </span>
-                    </div>
-                    <p className="text-gray-900 mb-2">{question.question_text}</p>
-                    {question.options && (
-                      <div className="text-sm text-gray-600 space-y-1">
-                        <div>A) {question.options.A}</div>
-                        <div>B) {question.options.B}</div>
-                        <div>C) {question.options.C}</div>
-                        <div>D) {question.options.D}</div>
+      <Tabs defaultValue="manual" className="w-full">
+        <TabsList>
+          <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+          <TabsTrigger value="excel">Excel Upload</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="manual">
+          <Card>
+            <CardHeader>
+              <CardTitle>Questions ({questions.length})</CardTitle>
+              <CardDescription>Manage all test questions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {questions.map((question) => (
+                  <div key={question.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            {question.subject}
+                          </span>
+                          <span className="text-sm bg-gray-100 text-gray-800 px-2 py-1 rounded">
+                            {question.question_type}
+                          </span>
+                          <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
+                            {question.marks} marks
+                          </span>
+                        </div>
+                        <p className="text-gray-900 mb-2">{question.question_text}</p>
+                        {question.options && (
+                          <div className="text-sm text-gray-600 space-y-1">
+                            <div>A) {question.options.A}</div>
+                            <div>B) {question.options.B}</div>
+                            <div>C) {question.options.C}</div>
+                            <div>D) {question.options.D}</div>
+                          </div>
+                        )}
+                        <p className="text-sm font-medium text-green-600 mt-2">
+                          Correct Answer: {question.correct_answer}
+                        </p>
                       </div>
-                    )}
-                    <p className="text-sm font-medium text-green-600 mt-2">
-                      Correct Answer: {question.correct_answer}
-                    </p>
+                      <div className="flex space-x-2">
+                        <Button variant="outline" size="sm" onClick={() => handleEdit(question)}>
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleDelete(question.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEdit(question)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDelete(question.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                ))}
+                
+                {questions.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    No questions added yet. Click "Add Question" to get started.
                   </div>
-                </div>
+                )}
               </div>
-            ))}
-            
-            {questions.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                No questions added yet. Click "Add Question" to get started.
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="excel">
+          <ExcelQuestionUpload />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
