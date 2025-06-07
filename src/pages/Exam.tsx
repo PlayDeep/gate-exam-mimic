@@ -298,6 +298,34 @@ const Exam = () => {
     }
   };
 
+  // Helper function to parse options correctly
+  const parseOptions = (options: any): Array<{id: string, text: string}> => {
+    if (!options) return [];
+    
+    // If it's already an array of objects with id and text
+    if (Array.isArray(options) && options.length > 0 && typeof options[0] === 'object' && 'id' in options[0]) {
+      return options as Array<{id: string, text: string}>;
+    }
+    
+    // If it's an array of strings, convert to objects
+    if (Array.isArray(options)) {
+      return (options as string[]).map((option, index) => ({
+        id: String.fromCharCode(65 + index), // A, B, C, D
+        text: option
+      }));
+    }
+    
+    // If it's an object, convert to array
+    if (typeof options === 'object') {
+      return Object.entries(options).map(([key, value]) => ({
+        id: key,
+        text: String(value)
+      }));
+    }
+    
+    return [];
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -406,50 +434,26 @@ const Exam = () => {
                         {/* Options for MCQ */}
                         {currentQuestionData.question_type === 'MCQ' && currentQuestionData.options && (
                           <div className="space-y-3">
-                            {(() => {
-                              // Handle different option formats
-                              let optionsToRender: Array<{id: string, text: string}> = [];
-                              
-                              if (Array.isArray(currentQuestionData.options)) {
-                                // If it's already an array of objects with id and text
-                                if (currentQuestionData.options.length > 0 && typeof currentQuestionData.options[0] === 'object' && 'id' in currentQuestionData.options[0]) {
-                                  optionsToRender = currentQuestionData.options as Array<{id: string, text: string}>;
-                                } else {
-                                  // If it's an array of strings, convert to objects
-                                  optionsToRender = (currentQuestionData.options as string[]).map((option, index) => ({
-                                    id: String.fromCharCode(65 + index), // A, B, C, D
-                                    text: option
-                                  }));
-                                }
-                              } else if (typeof currentQuestionData.options === 'object') {
-                                // If it's an object, convert to array
-                                optionsToRender = Object.entries(currentQuestionData.options).map(([key, value]) => ({
-                                  id: key,
-                                  text: String(value)
-                                }));
-                              }
-
-                              return optionsToRender.map(option => (
-                                <div
-                                  key={option.id}
-                                  className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                                  onClick={() => handleAnswerChange(currentQuestion, option.id)}
-                                >
-                                  <input
-                                    type="radio"
-                                    name={`question-${currentQuestion}`}
-                                    value={option.id}
-                                    checked={answers[currentQuestion] === option.id}
-                                    onChange={() => handleAnswerChange(currentQuestion, option.id)}
-                                    className="w-4 h-4"
-                                  />
-                                  <label className="flex-1 cursor-pointer">
-                                    <span className="font-medium mr-2">({option.id})</span>
-                                    {option.text}
-                                  </label>
-                                </div>
-                              ));
-                            })()}
+                            {parseOptions(currentQuestionData.options).map(option => (
+                              <div
+                                key={option.id}
+                                className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                                onClick={() => handleAnswerChange(currentQuestion, option.id)}
+                              >
+                                <input
+                                  type="radio"
+                                  name={`question-${currentQuestion}`}
+                                  value={option.id}
+                                  checked={answers[currentQuestion] === option.id}
+                                  onChange={() => handleAnswerChange(currentQuestion, option.id)}
+                                  className="w-4 h-4"
+                                />
+                                <label className="flex-1 cursor-pointer">
+                                  <span className="font-medium mr-2">({option.id})</span>
+                                  {option.text}
+                                </label>
+                              </div>
+                            ))}
                           </div>
                         )}
 
