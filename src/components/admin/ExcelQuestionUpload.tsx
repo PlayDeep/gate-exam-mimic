@@ -1,23 +1,13 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '@/integrations/supabase/client';
-
-const subjects = [
-  { code: "CS", name: "Computer Science & Information Technology" },
-  { code: "ME", name: "Mechanical Engineering" },
-  { code: "EE", name: "Electrical Engineering" },
-  { code: "CE", name: "Civil Engineering" },
-  { code: "ECE", name: "Electronics & Communication" },
-  { code: "CH", name: "Chemical Engineering" }
-];
+import TemplateDownload from './excel/TemplateDownload';
+import FileUploadForm from './excel/FileUploadForm';
+import QuestionPreview from './excel/QuestionPreview';
 
 interface ExcelQuestion {
   question_text: string;
@@ -44,52 +34,6 @@ const ExcelQuestionUpload: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<ExcelQuestion[]>([]);
   const { toast } = useToast();
-
-  const downloadTemplate = () => {
-    const template = [
-      {
-        question_text: "What is 2 + 2?",
-        question_image: "",
-        option_a: "3",
-        option_a_image: "",
-        option_b: "4",
-        option_b_image: "",
-        option_c: "5",
-        option_c_image: "",
-        option_d: "6",
-        option_d_image: "",
-        correct_answer: "B",
-        explanation: "2 + 2 equals 4",
-        explanation_image: "",
-        question_type: "MCQ",
-        marks: 1,
-        negative_marks: 0.33
-      },
-      {
-        question_text: "Calculate the square root of 16",
-        question_image: "",
-        option_a: "",
-        option_a_image: "",
-        option_b: "",
-        option_b_image: "",
-        option_c: "",
-        option_c_image: "",
-        option_d: "",
-        option_d_image: "",
-        correct_answer: "4",
-        explanation: "√16 = 4",
-        explanation_image: "",
-        question_type: "NAT",
-        marks: 2,
-        negative_marks: 0
-      }
-    ];
-
-    const ws = XLSX.utils.json_to_sheet(template);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Questions Template");
-    XLSX.writeFile(wb, "questions_template.xlsx");
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -145,7 +89,6 @@ const ExcelQuestionUpload: React.FC = () => {
       for (const question of preview) {
         console.log('Processing question:', question.question_text);
         
-        // Prepare question data without image processing for now
         const questionData = {
           subject: subject,
           question_text: question.question_text,
@@ -167,7 +110,6 @@ const ExcelQuestionUpload: React.FC = () => {
 
       console.log('Uploading questions to database...', questionsToUpload);
 
-      // Upload to database
       const { data, error } = await supabase
         .from('questions')
         .insert(questionsToUpload)
@@ -185,12 +127,11 @@ const ExcelQuestionUpload: React.FC = () => {
         description: `Successfully uploaded ${questionsToUpload.length} questions!`,
       });
 
-      // Reset form
       setFile(null);
       setPreview([]);
       setSubject('');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload error:', error);
       toast({
         title: "Upload Failed",
@@ -215,83 +156,20 @@ const ExcelQuestionUpload: React.FC = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="font-medium">Download Template</h4>
-              <p className="text-sm text-gray-600">Get the Excel template with proper format</p>
-            </div>
-            <Button variant="outline" onClick={downloadTemplate}>
-              <Download className="h-4 w-4 mr-2" />
-              Download Template
-            </Button>
-          </div>
+          <TemplateDownload />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="subject">Subject</Label>
-              <Select value={subject} onValueChange={setSubject}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select subject" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subjects.map((subj) => (
-                    <SelectItem key={subj.code} value={subj.code}>
-                      {subj.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <FileUploadForm
+            subject={subject}
+            onSubjectChange={setSubject}
+            onFileChange={handleFileChange}
+          />
 
-            <div className="space-y-2">
-              <Label htmlFor="file">Excel File</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileChange}
-              />
-            </div>
-          </div>
-
-          {preview.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="font-medium">Preview ({preview.length} questions)</h4>
-                <Button 
-                  onClick={handleUpload} 
-                  disabled={uploading || !subject}
-                  className="flex items-center gap-2"
-                >
-                  <Upload className="h-4 w-4" />
-                  {uploading ? 'Uploading...' : 'Upload Questions'}
-                </Button>
-              </div>
-
-              <div className="max-h-64 overflow-y-auto border rounded-lg">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="p-2 text-left">Question</th>
-                      <th className="p-2 text-left">Type</th>
-                      <th className="p-2 text-left">Correct Answer</th>
-                      <th className="p-2 text-left">Marks</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.map((q, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="p-2">{q.question_text.slice(0, 50)}...</td>
-                        <td className="p-2">{q.question_type}</td>
-                        <td className="p-2">{q.correct_answer}</td>
-                        <td className="p-2">{q.marks}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          <QuestionPreview
+            preview={preview}
+            subject={subject}
+            uploading={uploading}
+            onUpload={handleUpload}
+          />
         </CardContent>
       </Card>
     </div>
