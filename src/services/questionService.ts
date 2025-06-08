@@ -5,12 +5,19 @@ export interface Question {
   id: string;
   subject: string;
   question_text: string;
-  options?: { id: string; text: string }[];
+  question_image?: string;
+  options?: { 
+    [key: string]: { 
+      text: string; 
+      image?: string; 
+    } 
+  } | { id: string; text: string; image?: string }[];
   correct_answer: string;
   question_type: 'MCQ' | 'NAT';
   marks: number;
   negative_marks?: number;
   explanation?: string;
+  explanation_image?: string;
 }
 
 export const getRandomQuestionsForTest = async (subject: string, limit: number = 65): Promise<Question[]> => {
@@ -36,12 +43,14 @@ export const getRandomQuestionsForTest = async (subject: string, limit: number =
     id: q.id,
     subject: q.subject,
     question_text: q.question_text,
-    options: q.options as { id: string; text: string }[] | undefined,
+    question_image: q.question_image || undefined,
+    options: q.options as { [key: string]: { text: string; image?: string } } | { id: string; text: string; image?: string }[] | undefined,
     correct_answer: q.correct_answer,
     question_type: q.question_type as 'MCQ' | 'NAT',
     marks: q.marks,
     negative_marks: q.negative_marks || 0,
-    explanation: q.explanation || undefined
+    explanation: q.explanation || undefined,
+    explanation_image: q.explanation_image || undefined
   }));
 };
 

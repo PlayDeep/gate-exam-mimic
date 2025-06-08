@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { Plus } from 'lucide-react';
+import { Plus, TestTube } from 'lucide-react';
 import ExcelQuestionUpload from './ExcelQuestionUpload';
 import QuestionForm from './question/QuestionForm';
 import QuestionList from './question/QuestionList';
@@ -62,6 +63,62 @@ const QuestionManager: React.FC = () => {
       setQuestions(data || []);
     }
     setLoading(false);
+  };
+
+  const addSampleImageQuestion = async () => {
+    setLoading(true);
+    try {
+      const sampleQuestion = {
+        subject: 'CS',
+        question_text: 'Look at the following network diagram and identify the topology:',
+        question_image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=500&h=300&fit=crop',
+        question_type: 'MCQ',
+        marks: 2,
+        negative_marks: 0.5,
+        correct_answer: 'B',
+        explanation: 'This is a star topology where all nodes connect to a central hub.',
+        explanation_image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=250&fit=crop',
+        options: {
+          A: { 
+            text: 'Bus Topology',
+            image: null
+          },
+          B: { 
+            text: 'Star Topology',
+            image: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=200&h=150&fit=crop'
+          },
+          C: { 
+            text: 'Ring Topology',
+            image: null
+          },
+          D: { 
+            text: 'Mesh Topology',
+            image: null
+          }
+        }
+      };
+
+      const { error } = await supabase
+        .from('questions')
+        .insert([sampleQuestion]);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Sample image-based question added successfully!"
+      });
+      
+      fetchQuestions();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to add sample question: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -179,30 +236,36 @@ const QuestionManager: React.FC = () => {
           <h2 className="text-2xl font-bold">Question Manager</h2>
           <p className="text-gray-600">Add and manage test questions</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { resetForm(); setEditingQuestion(null); }}>
-              <Plus className="mr-2 h-4 w-4" />
-              Add Question
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingQuestion ? 'Edit Question' : 'Add New Question'}
-              </DialogTitle>
-            </DialogHeader>
-            
-            <QuestionForm
-              formData={formData}
-              editingQuestion={editingQuestion}
-              loading={loading}
-              onSubmit={handleSubmit}
-              onCancel={() => setIsDialogOpen(false)}
-              onFormDataChange={setFormData}
-            />
-          </DialogContent>
-        </Dialog>
+        <div className="flex items-center space-x-2">
+          <Button onClick={addSampleImageQuestion} variant="outline" disabled={loading}>
+            <TestTube className="mr-2 h-4 w-4" />
+            Add Sample Image Question
+          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { resetForm(); setEditingQuestion(null); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Question
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingQuestion ? 'Edit Question' : 'Add New Question'}
+                </DialogTitle>
+              </DialogHeader>
+              
+              <QuestionForm
+                formData={formData}
+                editingQuestion={editingQuestion}
+                loading={loading}
+                onSubmit={handleSubmit}
+                onCancel={() => setIsDialogOpen(false)}
+                onFormDataChange={setFormData}
+              />
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Tabs defaultValue="manual" className="w-full">

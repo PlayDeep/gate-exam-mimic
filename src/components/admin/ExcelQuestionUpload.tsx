@@ -97,11 +97,25 @@ const ExcelQuestionUpload: React.FC = () => {
           negative_marks: question.negative_marks || 0,
           correct_answer: question.correct_answer,
           explanation: question.explanation || null,
+          question_image: question.question_image || null,
+          explanation_image: question.explanation_image || null,
           options: question.question_type === 'MCQ' ? {
-            A: question.option_a,
-            B: question.option_b,
-            C: question.option_c,
-            D: question.option_d
+            A: { 
+              text: question.option_a,
+              image: question.option_a_image || null
+            },
+            B: { 
+              text: question.option_b,
+              image: question.option_b_image || null
+            },
+            C: { 
+              text: question.option_c,
+              image: question.option_c_image || null
+            },
+            D: { 
+              text: question.option_d,
+              image: question.option_d_image || null
+            }
           } : null
         };
 
@@ -124,7 +138,7 @@ const ExcelQuestionUpload: React.FC = () => {
 
       toast({
         title: "Upload Successful",
-        description: `Successfully uploaded ${questionsToUpload.length} questions!`,
+        description: `Successfully uploaded ${questionsToUpload.length} questions with image support!`,
       });
 
       setFile(null);
@@ -152,7 +166,7 @@ const ExcelQuestionUpload: React.FC = () => {
             Excel Question Upload
           </CardTitle>
           <CardDescription>
-            Upload questions in bulk using Excel format. Images are not supported in this version.
+            Upload questions in bulk using Excel format. Supports image URLs for questions, options, and explanations.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

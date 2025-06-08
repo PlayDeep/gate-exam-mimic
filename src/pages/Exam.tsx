@@ -353,7 +353,7 @@ const Exam = () => {
   };
 
   // Helper function to parse options correctly
-  const parseOptions = (options: any): Array<{id: string, text: string}> => {
+  const parseOptions = (options: any): Array<{id: string, text: string, image?: string}> => {
     if (!options) return [];
     
     console.log('Parsing options:', options, 'Type:', typeof options);
@@ -361,7 +361,7 @@ const Exam = () => {
     // If it's already an array of objects with id and text
     if (Array.isArray(options) && options.length > 0 && typeof options[0] === 'object' && 'id' in options[0]) {
       console.log('Options are already in correct format');
-      return options as Array<{id: string, text: string}>;
+      return options as Array<{id: string, text: string, image?: string}>;
     }
     
     // If it's an array of strings, convert to objects
@@ -369,19 +369,32 @@ const Exam = () => {
       console.log('Converting string array to options format');
       const converted = options.map((option, index) => ({
         id: String.fromCharCode(65 + index), // A, B, C, D
-        text: String(option)
+        text: String(option),
+        image: undefined
       }));
       console.log('Converted options:', converted);
       return converted;
     }
     
-    // If it's an object, convert to array
+    // If it's an object, convert to array (new format with image support)
     if (typeof options === 'object') {
       console.log('Converting object to options format');
-      const converted = Object.entries(options).map(([key, value]) => ({
-        id: key,
-        text: String(value)
-      }));
+      const converted = Object.entries(options).map(([key, value]) => {
+        // Handle new format with text and image
+        if (typeof value === 'object' && value !== null && 'text' in value) {
+          return {
+            id: key,
+            text: String(value.text || ''),
+            image: value.image || undefined
+          };
+        }
+        // Handle old format (just text)
+        return {
+          id: key,
+          text: String(value),
+          image: undefined
+        };
+      });
       console.log('Converted options:', converted);
       return converted;
     }
@@ -493,6 +506,19 @@ const Exam = () => {
                         
                         <div className="prose prose-lg max-w-none mb-6">
                           <p>{currentQuestionData.question_text}</p>
+                          {currentQuestionData.question_image && (
+                            <div className="mt-4">
+                              <img 
+                                src={currentQuestionData.question_image} 
+                                alt="Question diagram"
+                                className="max-w-full h-auto rounded-lg border shadow-sm"
+                                onError={(e) => {
+                                  console.error('Failed to load question image:', currentQuestionData.question_image);
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          )}
                         </div>
 
                         {/* Options for MCQ */}
@@ -501,7 +527,7 @@ const Exam = () => {
                             {parseOptions(currentQuestionData.options).map(option => (
                               <div
                                 key={option.id}
-                                className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                                className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
                                 onClick={() => handleAnswerChange(currentQuestion, option.id)}
                               >
                                 <input
@@ -510,12 +536,27 @@ const Exam = () => {
                                   value={option.id}
                                   checked={answers[currentQuestion] === option.id}
                                   onChange={() => handleAnswerChange(currentQuestion, option.id)}
-                                  className="w-4 h-4"
+                                  className="w-4 h-4 mt-1 flex-shrink-0"
                                 />
-                                <label className="flex-1 cursor-pointer">
-                                  <span className="font-medium mr-2">({option.id})</span>
-                                  {option.text}
-                                </label>
+                                <div className="flex-1">
+                                  <label className="cursor-pointer block">
+                                    <span className="font-medium mr-2">({option.id})</span>
+                                    {option.text}
+                                  </label>
+                                  {option.image && (
+                                    <div className="mt-2">
+                                      <img 
+                                        src={option.image} 
+                                        alt={`Option ${option.id}`}
+                                        className="max-w-xs h-auto rounded border shadow-sm"
+                                        onError={(e) => {
+                                          console.error('Failed to load option image:', option.image);
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
