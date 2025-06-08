@@ -115,6 +115,7 @@ const ExcelQuestionUpload: React.FC = () => {
           description: `Found ${jsonData.length} questions in the Excel file`,
         });
       } catch (error) {
+        console.error('Parse error:', error);
         toast({
           title: "Parse Error",
           description: "Failed to parse Excel file. Please check the format.",
@@ -123,31 +124,6 @@ const ExcelQuestionUpload: React.FC = () => {
       }
     };
     reader.readAsArrayBuffer(file);
-  };
-
-  const uploadImageFromBase64 = async (base64String: string, fileName: string): Promise<string | null> => {
-    try {
-      // Convert base64 to blob
-      const response = await fetch(base64String);
-      const blob = await response.blob();
-      
-      const fileExt = fileName.split('.').pop();
-      const filePath = `question-images/${Date.now()}-${Math.random()}.${fileExt}`;
-      
-      const { data, error } = await supabase.storage
-        .from('question-assets')
-        .upload(filePath, blob);
-
-      if (error) {
-        console.error('Image upload error:', error);
-        return null;
-      }
-
-      return data.path;
-    } catch (error) {
-      console.error('Error processing image:', error);
-      return null;
-    }
   };
 
   const handleUpload = async () => {
@@ -163,65 +139,46 @@ const ExcelQuestionUpload: React.FC = () => {
     setUploading(true);
     
     try {
+      console.log('Starting upload process...');
       const questionsToUpload = [];
 
       for (const question of preview) {
-        // Process images if they exist (assuming they are base64 strings or URLs)
-        let questionImageUrl = null;
-        let explanationImageUrl = null;
-        const optionImages: Record<string, string | null> = {};
-
-        if (question.question_image) {
-          questionImageUrl = await uploadImageFromBase64(question.question_image, 'question.jpg');
-        }
-
-        if (question.explanation_image) {
-          explanationImageUrl = await uploadImageFromBase64(question.explanation_image, 'explanation.jpg');
-        }
-
-        // Process option images
-        for (const optionKey of ['option_a_image', 'option_b_image', 'option_c_image', 'option_d_image']) {
-          const imageData = question[optionKey as keyof ExcelQuestion] as string;
-          if (imageData) {
-            const optionLetter = optionKey.split('_')[1].toUpperCase();
-            optionImages[optionLetter] = await uploadImageFromBase64(imageData, `option_${optionLetter}.jpg`);
-          }
-        }
-
-        // Prepare question data
+        console.log('Processing question:', question.question_text);
+        
+        // Prepare question data without image processing for now
         const questionData = {
           subject: subject,
           question_text: question.question_text,
-          question_image: questionImageUrl,
           question_type: question.question_type,
           marks: question.marks || 1,
           negative_marks: question.negative_marks || 0,
           correct_answer: question.correct_answer,
-          explanation: question.explanation,
-          explanation_image: explanationImageUrl,
+          explanation: question.explanation || null,
           options: question.question_type === 'MCQ' ? {
             A: question.option_a,
-            A_image: optionImages.A,
             B: question.option_b,
-            B_image: optionImages.B,
             C: question.option_c,
-            C_image: optionImages.C,
-            D: question.option_d,
-            D_image: optionImages.D
+            D: question.option_d
           } : null
         };
 
         questionsToUpload.push(questionData);
       }
 
+      console.log('Uploading questions to database...', questionsToUpload);
+
       // Upload to database
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('questions')
-        .insert(questionsToUpload);
+        .insert(questionsToUpload)
+        .select();
 
       if (error) {
+        console.error('Database error:', error);
         throw error;
       }
+
+      console.log('Upload successful:', data);
 
       toast({
         title: "Upload Successful",
@@ -237,7 +194,7 @@ const ExcelQuestionUpload: React.FC = () => {
       console.error('Upload error:', error);
       toast({
         title: "Upload Failed",
-        description: "Failed to upload questions. Please try again.",
+        description: `Failed to upload questions: ${error.message || 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
@@ -254,7 +211,7 @@ const ExcelQuestionUpload: React.FC = () => {
             Excel Question Upload
           </CardTitle>
           <CardDescription>
-            Upload questions in bulk using Excel format. Supports both text and image content.
+            Upload questions in bulk using Excel format. Images are not supported in this version.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -1,3 +1,4 @@
+
 import { useLocation, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,6 @@ const Results = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [showDetailedAnalysis, setShowDetailedAnalysis] = useState(false);
   const [showReviewMode, setShowReviewMode] = useState(false);
   
   const { answers, questions, timeSpent, subject, score: passedScore, percentage: passedPercentage } = location.state || {};
@@ -233,8 +233,6 @@ const Results = () => {
 
   const handleReviewAnswers = () => {
     setShowReviewMode(!showReviewMode);
-    // Don't automatically show detailed analysis when entering review mode
-    // Let user control it separately
   };
 
   // Helper function to parse options for display
@@ -457,25 +455,17 @@ const Results = () => {
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
               <span>Answer Review</span>
-              <div className="flex space-x-2">
-                <Button
-                  variant={showReviewMode ? "default" : "outline"}
-                  onClick={handleReviewAnswers}
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  {showReviewMode ? 'Exit Review Mode' : 'Review Answers'}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDetailedAnalysis(!showDetailedAnalysis)}
-                >
-                  {showDetailedAnalysis ? 'Hide Details' : 'Show Details'}
-                </Button>
-              </div>
+              <Button
+                variant={showReviewMode ? "default" : "outline"}
+                onClick={handleReviewAnswers}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                {showReviewMode ? 'Exit Review Mode' : 'Review Answers'}
+              </Button>
             </CardTitle>
           </CardHeader>
           
-          {showDetailedAnalysis && (
+          {showReviewMode && (
             <CardContent>
               <div className="space-y-4">
                 {questions.map((question: any, index: number) => {
@@ -489,7 +479,7 @@ const Results = () => {
                   const isAnswered = !!userAnswer;
                   
                   return (
-                    <div key={questionNum} className={`border rounded-lg p-4 ${showReviewMode ? (isCorrect ? 'border-green-200 bg-green-50' : isAnswered ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50') : ''}`}>
+                    <div key={questionNum} className={`border rounded-lg p-4 ${isCorrect ? 'border-green-200 bg-green-50' : isAnswered ? 'border-red-200 bg-red-50' : 'border-yellow-200 bg-yellow-50'}`}>
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
@@ -502,7 +492,7 @@ const Results = () => {
                           </div>
                           <p className="text-sm text-gray-700 mb-2">{question.question_text}</p>
                           
-                          {showReviewMode && question.options && question.question_type === 'MCQ' && (
+                          {question.options && question.question_type === 'MCQ' && (
                             <div className="mt-3 space-y-2">
                               {parseOptionsForDisplay(question.options).map((option: any, optIndex: number) => (
                                 <div 
@@ -525,6 +515,13 @@ const Results = () => {
                                   )}
                                 </div>
                               ))}
+                            </div>
+                          )}
+
+                          {question.explanation && (
+                            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                              <div className="font-medium text-blue-800 mb-1">Explanation:</div>
+                              <div className="text-sm text-blue-700">{question.explanation}</div>
                             </div>
                           )}
                         </div>
