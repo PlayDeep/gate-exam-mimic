@@ -101,19 +101,19 @@ const ExcelQuestionUpload: React.FC = () => {
           explanation_image: question.explanation_image || null,
           options: question.question_type === 'MCQ' ? {
             A: { 
-              text: question.option_a,
+              text: question.option_a || '',
               image: question.option_a_image || null
             },
             B: { 
-              text: question.option_b,
+              text: question.option_b || '',
               image: question.option_b_image || null
             },
             C: { 
-              text: question.option_c,
+              text: question.option_c || '',
               image: question.option_c_image || null
             },
             D: { 
-              text: question.option_d,
+              text: question.option_d || '',
               image: question.option_d_image || null
             }
           } : null

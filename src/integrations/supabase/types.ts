@@ -42,10 +42,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           explanation: string | null
+          explanation_image: string | null
           id: string
           marks: number
           negative_marks: number | null
           options: Json | null
+          question_image: string | null
           question_text: string
           question_type: string
           subject: string
@@ -56,10 +58,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           explanation?: string | null
+          explanation_image?: string | null
           id?: string
           marks?: number
           negative_marks?: number | null
           options?: Json | null
+          question_image?: string | null
           question_text: string
           question_type?: string
           subject: string
@@ -70,10 +74,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           explanation?: string | null
+          explanation_image?: string | null
           id?: string
           marks?: number
           negative_marks?: number | null
           options?: Json | null
+          question_image?: string | null
           question_text?: string
           question_type?: string
           subject?: string

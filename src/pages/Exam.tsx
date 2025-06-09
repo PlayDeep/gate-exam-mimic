@@ -382,10 +382,11 @@ const Exam = () => {
       const converted = Object.entries(options).map(([key, value]) => {
         // Handle new format with text and image
         if (typeof value === 'object' && value !== null && 'text' in value) {
+          const optionValue = value as { text: unknown; image?: string };
           return {
             id: key,
-            text: String(value.text || ''),
-            image: value.image || undefined
+            text: String(optionValue.text || ''),
+            image: optionValue.image || undefined
           };
         }
         // Handle old format (just text)
