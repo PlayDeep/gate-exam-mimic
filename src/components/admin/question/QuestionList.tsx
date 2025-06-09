@@ -29,6 +29,50 @@ const QuestionList = ({ questions, onEdit, onDelete }: QuestionListProps) => {
     );
   }
 
+  // Helper function to parse options correctly
+  const parseOptions = (options: any): Array<{id: string, text: string}> => {
+    if (!options) return [];
+    
+    // If it's already an array of objects with id and text
+    if (Array.isArray(options) && options.length > 0 && typeof options[0] === 'object' && 'id' in options[0]) {
+      return options.map(option => ({
+        id: option.id,
+        text: typeof option.text === 'object' && option.text !== null ? 
+          (option.text.text || String(option.text)) : 
+          String(option.text)
+      }));
+    }
+    
+    // If it's an array of strings, convert to objects
+    if (Array.isArray(options)) {
+      return options.map((option, index) => ({
+        id: String.fromCharCode(65 + index), // A, B, C, D
+        text: String(option)
+      }));
+    }
+    
+    // If it's an object, convert to array
+    if (typeof options === 'object') {
+      return Object.entries(options).map(([key, value]) => {
+        // Handle new format with text and image
+        if (typeof value === 'object' && value !== null && 'text' in value) {
+          const optionValue = value as { text: unknown; image?: string };
+          return {
+            id: key,
+            text: String(optionValue.text || '')
+          };
+        }
+        // Handle old format (just text)
+        return {
+          id: key,
+          text: String(value)
+        };
+      });
+    }
+    
+    return [];
+  };
+
   return (
     <div className="space-y-4">
       {questions.map((question) => (
@@ -49,10 +93,11 @@ const QuestionList = ({ questions, onEdit, onDelete }: QuestionListProps) => {
               <p className="text-gray-900 mb-2">{question.question_text}</p>
               {question.options && (
                 <div className="text-sm text-gray-600 space-y-1">
-                  <div>A) {question.options.A}</div>
-                  <div>B) {question.options.B}</div>
-                  <div>C) {question.options.C}</div>
-                  <div>D) {question.options.D}</div>
+                  {parseOptions(question.options).map(option => (
+                    <div key={option.id}>
+                      {option.id}) {option.text}
+                    </div>
+                  ))}
                 </div>
               )}
               <p className="text-sm font-medium text-green-600 mt-2">
