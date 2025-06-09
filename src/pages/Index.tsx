@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +14,8 @@ const subjects = [
   { id: 'ME', name: 'Mechanical Engineering', duration: '3 hours', questions: 65, color: 'bg-green-500' },
   { id: 'EE', name: 'Electrical Engineering', duration: '3 hours', questions: 65, color: 'bg-purple-500' },
   { id: 'CE', name: 'Civil Engineering', duration: '3 hours', questions: 65, color: 'bg-orange-500' },
-  { id: 'EC', name: 'Electronics & Communication', duration: '3 hours', questions: 65, color: 'bg-red-500' },
-  { id: 'IN', name: 'Instrumentation Engineering', duration: '3 hours', questions: 65, color: 'bg-indigo-500' },
+  { id: 'ECE', name: 'Electronics & Communication', duration: '3 hours', questions: 65, color: 'bg-red-500' },
+  { id: 'CH', name: 'Chemical Engineering', duration: '3 hours', questions: 65, color: 'bg-pink-500' },
 ];
 
 const Index = () => {
