@@ -542,7 +542,7 @@ const Exam = () => {
                                 <div className="flex-1">
                                   <label className="cursor-pointer block">
                                     <span className="font-medium mr-2">({option.id})</span>
-                                    {option.text}
+                                    <span>{option.text}</span>
                                   </label>
                                   {option.image && (
                                     <div className="mt-2">
