@@ -1,15 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { Plus, TestTube } from 'lucide-react';
-import ExcelQuestionUpload from './ExcelQuestionUpload';
-import QuestionForm from './question/QuestionForm';
-import QuestionList from './question/QuestionList';
+import QuestionStats from './question/QuestionStats';
+import QuestionActions from './question/QuestionActions';
+import QuestionFormDialog from './question/QuestionFormDialog';
+import QuestionManagerTabs from './question/QuestionManagerTabs';
 
 interface Question {
   id: string;
@@ -47,6 +43,7 @@ const QuestionManager: React.FC = () => {
   }, []);
 
   const fetchQuestions = async () => {
+    console.log('Fetching all questions...');
     setLoading(true);
     const { data, error } = await supabase
       .from('questions')
@@ -54,12 +51,18 @@ const QuestionManager: React.FC = () => {
       .order('created_at', { ascending: false });
 
     if (error) {
+      console.error('Error fetching questions:', error);
       toast({
         title: "Error",
         description: "Failed to fetch questions",
         variant: "destructive"
       });
     } else {
+      console.log('Fetched questions:', data?.length || 0, 'questions');
+      console.log('Questions by subject:', data?.reduce((acc, q) => {
+        acc[q.subject] = (acc[q.subject] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>));
       setQuestions(data || []);
     }
     setLoading(false);
@@ -111,6 +114,7 @@ const QuestionManager: React.FC = () => {
       
       fetchQuestions();
     } catch (error: any) {
+      console.error('Error adding sample question:', error);
       toast({
         title: "Error",
         description: `Failed to add sample question: ${error.message}`,
@@ -154,6 +158,7 @@ const QuestionManager: React.FC = () => {
     }
 
     if (result.error) {
+      console.error('Error saving question:', result.error);
       toast({
         title: "Error",
         description: `Failed to ${editingQuestion ? 'update' : 'create'} question`,
@@ -181,6 +186,7 @@ const QuestionManager: React.FC = () => {
       .eq('id', id);
 
     if (error) {
+      console.error('Error deleting question:', error);
       toast({
         title: "Error",
         description: "Failed to delete question",
@@ -229,71 +235,39 @@ const QuestionManager: React.FC = () => {
     });
   };
 
+  const handleAddQuestion = () => {
+    resetForm();
+    setEditingQuestion(null);
+    setIsDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Question Manager</h2>
-          <p className="text-gray-600">Add and manage test questions</p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button onClick={addSampleImageQuestion} variant="outline" disabled={loading}>
-            <TestTube className="mr-2 h-4 w-4" />
-            Add Sample Image Question
-          </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => { resetForm(); setEditingQuestion(null); }}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Question
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingQuestion ? 'Edit Question' : 'Add New Question'}
-                </DialogTitle>
-              </DialogHeader>
-              
-              <QuestionForm
-                formData={formData}
-                editingQuestion={editingQuestion}
-                loading={loading}
-                onSubmit={handleSubmit}
-                onCancel={() => setIsDialogOpen(false)}
-                onFormDataChange={setFormData}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
+        <QuestionStats questionsCount={questions.length} />
+        <QuestionActions
+          onAddSample={addSampleImageQuestion}
+          onAddQuestion={handleAddQuestion}
+          loading={loading}
+        />
       </div>
 
-      <Tabs defaultValue="manual" className="w-full">
-        <TabsList>
-          <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-          <TabsTrigger value="excel">Excel Upload</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="manual">
-          <Card>
-            <CardHeader>
-              <CardTitle>Questions ({questions.length})</CardTitle>
-              <CardDescription>Manage all test questions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <QuestionList
-                questions={questions}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="excel">
-          <ExcelQuestionUpload />
-        </TabsContent>
-      </Tabs>
+      <QuestionFormDialog
+        isOpen={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        editingQuestion={editingQuestion}
+        formData={formData}
+        loading={loading}
+        onSubmit={handleSubmit}
+        onCancel={() => setIsDialogOpen(false)}
+        onFormDataChange={setFormData}
+      />
+
+      <QuestionManagerTabs
+        questions={questions}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+      />
     </div>
   );
 };

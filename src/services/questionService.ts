@@ -21,17 +21,25 @@ export interface Question {
 }
 
 export const getRandomQuestionsForTest = async (subject: string, limit: number = 65): Promise<Question[]> => {
+  console.log('=== FETCHING QUESTIONS FOR TEST ===');
+  console.log('Subject:', subject);
+  console.log('Limit:', limit);
+  
   const { data, error } = await supabase
     .from('questions')
     .select('*')
     .eq('subject', subject);
 
   if (error) {
-    console.error('Error fetching questions:', error);
+    console.error('Error fetching questions from database:', error);
     throw error;
   }
 
+  console.log('Raw questions from database:', data?.length || 0);
+  console.log('Questions data:', data);
+
   if (!data || data.length === 0) {
+    console.warn('No questions found for subject:', subject);
     return [];
   }
 
@@ -39,7 +47,13 @@ export const getRandomQuestionsForTest = async (subject: string, limit: number =
   const shuffled = data.sort(() => 0.5 - Math.random());
   const selected = shuffled.slice(0, Math.min(limit, shuffled.length));
 
-  return selected.map(q => ({
+  console.log('Selected questions for test:', selected.length);
+  console.log('Questions by type:', selected.reduce((acc, q) => {
+    acc[q.question_type] = (acc[q.question_type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>));
+
+  const processedQuestions = selected.map(q => ({
     id: q.id,
     subject: q.subject,
     question_text: q.question_text,
@@ -52,9 +66,16 @@ export const getRandomQuestionsForTest = async (subject: string, limit: number =
     explanation: q.explanation || undefined,
     explanation_image: q.explanation_image || undefined
   }));
+
+  console.log('Processed questions for return:', processedQuestions.length);
+  console.log('=== END FETCHING QUESTIONS ===');
+  
+  return processedQuestions;
 };
 
 export const getAllSubjects = async (): Promise<string[]> => {
+  console.log('=== FETCHING ALL SUBJECTS ===');
+  
   const { data, error } = await supabase
     .from('questions')
     .select('subject')
@@ -66,5 +87,12 @@ export const getAllSubjects = async (): Promise<string[]> => {
   }
 
   const uniqueSubjects = [...new Set(data.map(item => item.subject))];
+  console.log('Available subjects:', uniqueSubjects);
+  console.log('Total questions by subject:', data.reduce((acc, item) => {
+    acc[item.subject] = (acc[item.subject] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>));
+  console.log('=== END FETCHING SUBJECTS ===');
+  
   return uniqueSubjects;
 };
