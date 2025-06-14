@@ -143,7 +143,7 @@ export const useQuestionManager = () => {
       const { error: answersError } = await supabase
         .from('user_answers')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all by using a condition that matches everything
 
       if (answersError) {
         console.error('useQuestionManager: Error deleting user answers:', answersError);
@@ -155,7 +155,7 @@ export const useQuestionManager = () => {
       const { error: questionsError } = await supabase
         .from('questions')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .gte('id', '00000000-0000-0000-0000-000000000000'); // Delete all by using a condition that matches everything
 
       if (questionsError) {
         console.error('useQuestionManager: Error deleting questions:', questionsError);
