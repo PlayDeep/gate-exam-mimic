@@ -74,7 +74,7 @@ export const deleteAllQuestions = async (): Promise<void> => {
   const { error: answersError } = await supabase
     .from('user_answers')
     .delete()
-    .neq('id', ''); // This will match all records since id is never empty
+    .gt('answered_at', '1900-01-01'); // This will match all records since answered_at has a default of now()
 
   if (answersError) {
     console.error('questionManagerService: Error deleting user answers:', answersError);
@@ -86,7 +86,7 @@ export const deleteAllQuestions = async (): Promise<void> => {
   const { error: questionsError } = await supabase
     .from('questions')
     .delete()
-    .neq('id', ''); // This will match all records since id is never empty
+    .gt('created_at', '1900-01-01'); // This will match all records since created_at has a default of now()
 
   if (questionsError) {
     console.error('questionManagerService: Error deleting questions:', questionsError);
