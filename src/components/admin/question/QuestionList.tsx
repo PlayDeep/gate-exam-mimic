@@ -1,20 +1,6 @@
-
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, Image } from "lucide-react";
-
-interface Question {
-  id: string;
-  subject: string;
-  question_text: string;
-  question_image?: string;
-  options?: any;
-  correct_answer: string;
-  question_type: string;
-  marks: number;
-  negative_marks: number;
-  explanation?: string;
-  explanation_image?: string;
-}
+import type { Question } from "@/types/question";
 
 interface QuestionListProps {
   questions: Question[];

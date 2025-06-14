@@ -1,22 +1,10 @@
-
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import ExcelQuestionUpload from '../ExcelQuestionUpload';
 import QuestionList from './QuestionList';
 import QuestionFilters from './QuestionFilters';
-
-interface Question {
-  id: string;
-  subject: string;
-  question_text: string;
-  options?: any;
-  correct_answer: string;
-  question_type: string;
-  marks: number;
-  negative_marks: number;
-  explanation?: string;
-}
+import type { Question } from '@/types/question';
 
 interface QuestionManagerTabsProps {
   questions: Question[];
