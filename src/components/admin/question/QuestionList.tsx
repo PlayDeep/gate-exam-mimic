@@ -23,10 +23,38 @@ interface QuestionListProps {
 }
 
 const QuestionList = ({ questions, onEdit, onDelete }: QuestionListProps) => {
-  if (questions.length === 0) {
+  console.log('QuestionList: Rendering with questions:', questions?.length || 0);
+  console.log('QuestionList: First few questions:', questions?.slice(0, 2));
+
+  if (!questions || questions.length === 0) {
     return (
       <div className="text-center py-8 text-gray-500">
         No questions added yet. Click "Add Question" to get started.
+      </div>
+    );
+  }
+
+  // Filter out any invalid questions
+  const validQuestions = questions.filter(question => {
+    const isValid = question && 
+      typeof question === 'object' && 
+      question.id && 
+      question.question_text && 
+      question.subject;
+    
+    if (!isValid) {
+      console.warn('QuestionList: Invalid question found:', question);
+    }
+    
+    return isValid;
+  });
+
+  console.log('QuestionList: Valid questions:', validQuestions.length);
+
+  if (validQuestions.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No valid questions found. Please check the question data.
       </div>
     );
   }
@@ -72,7 +100,7 @@ const QuestionList = ({ questions, onEdit, onDelete }: QuestionListProps) => {
 
   return (
     <div className="space-y-4">
-      {questions.map((question) => {
+      {validQuestions.map((question) => {
         const parsedOptions = parseOptions(question.options);
         
         return (
@@ -81,15 +109,15 @@ const QuestionList = ({ questions, onEdit, onDelete }: QuestionListProps) => {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-sm font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                    {question.subject}
+                    {question.subject || 'Unknown'}
                   </span>
                   <span className="text-sm bg-gray-100 text-gray-800 px-2 py-1 rounded">
-                    {question.question_type}
+                    {question.question_type || 'Unknown'}
                   </span>
                   <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
-                    {question.marks} marks
+                    {question.marks || 0} marks
                   </span>
-                  {question.negative_marks > 0 && (
+                  {(question.negative_marks || 0) > 0 && (
                     <span className="text-sm bg-red-100 text-red-800 px-2 py-1 rounded">
                       -{question.negative_marks} marks
                     </span>
@@ -128,7 +156,7 @@ const QuestionList = ({ questions, onEdit, onDelete }: QuestionListProps) => {
                 
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-green-600">
-                    Correct Answer: {question.correct_answer}
+                    Correct Answer: {question.correct_answer || 'Not specified'}
                   </p>
                   {question.explanation && (
                     <div className="flex items-center gap-1 text-sm text-gray-500">
