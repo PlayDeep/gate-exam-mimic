@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 interface Question {
   id: string;
@@ -42,7 +42,7 @@ export const useQuestionManager = () => {
   const [loading, setLoading] = useState(false);
 
   const fetchQuestions = async () => {
-    console.log('Fetching all questions...');
+    console.log('useQuestionManager: Fetching all questions...');
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -51,23 +51,25 @@ export const useQuestionManager = () => {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching questions:', error);
+        console.error('useQuestionManager: Error fetching questions:', error);
         toast({
           title: "Error",
           description: "Failed to fetch questions",
           variant: "destructive"
         });
+        setQuestions([]);
       } else {
-        console.log('Fetched questions:', data?.length || 0, 'questions');
+        console.log('useQuestionManager: Fetched questions:', data?.length || 0, 'questions');
         setQuestions(data || []);
       }
     } catch (error) {
-      console.error('Unexpected error fetching questions:', error);
+      console.error('useQuestionManager: Unexpected error fetching questions:', error);
       toast({
         title: "Error",
         description: "An unexpected error occurred",
         variant: "destructive"
       });
+      setQuestions([]);
     } finally {
       setLoading(false);
     }
@@ -119,7 +121,7 @@ export const useQuestionManager = () => {
       
       fetchQuestions();
     } catch (error: any) {
-      console.error('Error adding sample question:', error);
+      console.error('useQuestionManager: Error adding sample question:', error);
       toast({
         title: "Error",
         description: `Failed to add sample question: ${error.message}`,
@@ -151,7 +153,7 @@ export const useQuestionManager = () => {
       
       fetchQuestions();
     } catch (error: any) {
-      console.error('Error deleting all questions:', error);
+      console.error('useQuestionManager: Error deleting all questions:', error);
       toast({
         title: "Error",
         description: `Failed to delete questions: ${error.message}`,
@@ -209,7 +211,7 @@ export const useQuestionManager = () => {
       }
 
       if (result.error) {
-        console.error('Error saving question:', result.error);
+        console.error('useQuestionManager: Error saving question:', result.error);
         toast({
           title: "Error",
           description: `Failed to ${editingQuestion ? 'update' : 'create'} question: ${result.error.message}`,
@@ -225,7 +227,7 @@ export const useQuestionManager = () => {
         return true;
       }
     } catch (error: any) {
-      console.error('Unexpected error saving question:', error);
+      console.error('useQuestionManager: Unexpected error saving question:', error);
       toast({
         title: "Error",
         description: `An unexpected error occurred: ${error.message}`,
@@ -247,7 +249,7 @@ export const useQuestionManager = () => {
         .eq('id', id);
 
       if (error) {
-        console.error('Error deleting question:', error);
+        console.error('useQuestionManager: Error deleting question:', error);
         toast({
           title: "Error",
           description: `Failed to delete question: ${error.message}`,
@@ -261,7 +263,7 @@ export const useQuestionManager = () => {
         fetchQuestions();
       }
     } catch (error: any) {
-      console.error('Unexpected error deleting question:', error);
+      console.error('useQuestionManager: Unexpected error deleting question:', error);
       toast({
         title: "Error",
         description: `An unexpected error occurred: ${error.message}`,
@@ -271,6 +273,7 @@ export const useQuestionManager = () => {
   };
 
   useEffect(() => {
+    console.log('useQuestionManager: Component mounted, fetching questions');
     fetchQuestions();
   }, []);
 

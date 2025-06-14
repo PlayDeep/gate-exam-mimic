@@ -61,16 +61,19 @@ export const useQuestionForm = () => {
   const [formData, setFormData] = useState<FormData>(initialFormData);
 
   const resetForm = () => {
+    console.log('useQuestionForm: Resetting form');
     setFormData(initialFormData);
   };
 
   const handleAddQuestion = () => {
+    console.log('useQuestionForm: Adding new question');
     resetForm();
     setEditingQuestion(null);
     setIsDialogOpen(true);
   };
 
   const handleEdit = (question: Question) => {
+    console.log('useQuestionForm: Editing question:', question.id);
     setEditingQuestion(question);
     
     const options = question.options || {};
@@ -98,6 +101,7 @@ export const useQuestionForm = () => {
   };
 
   const handleCancel = () => {
+    console.log('useQuestionForm: Canceling form');
     setIsDialogOpen(false);
     setEditingQuestion(null);
     resetForm();
