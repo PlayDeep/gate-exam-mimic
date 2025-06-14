@@ -76,49 +76,83 @@ const QuestionForm = ({ formData, editingQuestion, loading, onSubmit, onCancel, 
         />
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="question_image">Question Image URL (Optional)</Label>
+        <Input
+          id="question_image"
+          placeholder="https://example.com/image.jpg"
+          value={formData.question_image || ''}
+          onChange={(e) => setFormData(prev => ({ ...prev, question_image: e.target.value }))}
+        />
+      </div>
+
       {formData.question_type === 'MCQ' && (
         <div className="space-y-4">
           <Label>Options</Label>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="option_a">Option A</Label>
-              <Input
-                id="option_a"
-                placeholder="Enter option A"
-                value={formData.option_a}
-                onChange={(e) => setFormData(prev => ({ ...prev, option_a: e.target.value }))}
-                required
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="option_a">Option A</Label>
+                <Input
+                  id="option_a"
+                  placeholder="Enter option A"
+                  value={formData.option_a}
+                  onChange={(e) => setFormData(prev => ({ ...prev, option_a: e.target.value }))}
+                  required
+                />
+                <Input
+                  placeholder="Option A Image URL (optional)"
+                  value={formData.option_a_image || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, option_a_image: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="option_b">Option B</Label>
+                <Input
+                  id="option_b"
+                  placeholder="Enter option B"
+                  value={formData.option_b}
+                  onChange={(e) => setFormData(prev => ({ ...prev, option_b: e.target.value }))}
+                  required
+                />
+                <Input
+                  placeholder="Option B Image URL (optional)"
+                  value={formData.option_b_image || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, option_b_image: e.target.value }))}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="option_b">Option B</Label>
-              <Input
-                id="option_b"
-                placeholder="Enter option B"
-                value={formData.option_b}
-                onChange={(e) => setFormData(prev => ({ ...prev, option_b: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="option_c">Option C</Label>
-              <Input
-                id="option_c"
-                placeholder="Enter option C"
-                value={formData.option_c}
-                onChange={(e) => setFormData(prev => ({ ...prev, option_c: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="option_d">Option D</Label>
-              <Input
-                id="option_d"
-                placeholder="Enter option D"
-                value={formData.option_d}
-                onChange={(e) => setFormData(prev => ({ ...prev, option_d: e.target.value }))}
-                required
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="option_c">Option C</Label>
+                <Input
+                  id="option_c"
+                  placeholder="Enter option C"
+                  value={formData.option_c}
+                  onChange={(e) => setFormData(prev => ({ ...prev, option_c: e.target.value }))}
+                  required
+                />
+                <Input
+                  placeholder="Option C Image URL (optional)"
+                  value={formData.option_c_image || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, option_c_image: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="option_d">Option D</Label>
+                <Input
+                  id="option_d"
+                  placeholder="Enter option D"
+                  value={formData.option_d}
+                  onChange={(e) => setFormData(prev => ({ ...prev, option_d: e.target.value }))}
+                  required
+                />
+                <Input
+                  placeholder="Option D Image URL (optional)"
+                  value={formData.option_d_image || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, option_d_image: e.target.value }))}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -167,6 +201,16 @@ const QuestionForm = ({ formData, editingQuestion, loading, onSubmit, onCancel, 
           placeholder="Enter explanation for the answer"
           value={formData.explanation}
           onChange={(e) => setFormData(prev => ({ ...prev, explanation: e.target.value }))}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="explanation_image">Explanation Image URL (Optional)</Label>
+        <Input
+          id="explanation_image"
+          placeholder="https://example.com/explanation-image.jpg"
+          value={formData.explanation_image || ''}
+          onChange={(e) => setFormData(prev => ({ ...prev, explanation_image: e.target.value }))}
         />
       </div>
 

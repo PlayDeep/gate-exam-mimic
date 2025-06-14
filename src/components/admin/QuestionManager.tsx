@@ -17,6 +17,8 @@ interface Question {
   marks: number;
   negative_marks: number;
   explanation?: string;
+  question_image?: string;
+  explanation_image?: string;
 }
 
 const QuestionManager: React.FC = () => {
@@ -35,7 +37,13 @@ const QuestionManager: React.FC = () => {
     option_b: '',
     option_c: '',
     option_d: '',
-    explanation: ''
+    option_a_image: '',
+    option_b_image: '',
+    option_c_image: '',
+    option_d_image: '',
+    explanation: '',
+    question_image: '',
+    explanation_image: ''
   });
 
   useEffect(() => {
@@ -59,10 +67,6 @@ const QuestionManager: React.FC = () => {
       });
     } else {
       console.log('Fetched questions:', data?.length || 0, 'questions');
-      console.log('Questions by subject:', data?.reduce((acc, q) => {
-        acc[q.subject] = (acc[q.subject] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>));
       setQuestions(data || []);
     }
     setLoading(false);
@@ -125,6 +129,38 @@ const QuestionManager: React.FC = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    if (!confirm('Are you sure you want to delete ALL questions? This action cannot be undone.')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('questions')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "All questions deleted successfully!"
+      });
+      
+      fetchQuestions();
+    } catch (error: any) {
+      console.error('Error deleting all questions:', error);
+      toast({
+        title: "Error",
+        description: `Failed to delete questions: ${error.message}`,
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -137,11 +173,25 @@ const QuestionManager: React.FC = () => {
       negative_marks: formData.negative_marks,
       correct_answer: formData.correct_answer,
       explanation: formData.explanation,
+      question_image: formData.question_image || null,
+      explanation_image: formData.explanation_image || null,
       options: formData.question_type === 'MCQ' ? {
-        A: formData.option_a,
-        B: formData.option_b,
-        C: formData.option_c,
-        D: formData.option_d
+        A: {
+          text: formData.option_a,
+          image: formData.option_a_image || null
+        },
+        B: {
+          text: formData.option_b,
+          image: formData.option_b_image || null
+        },
+        C: {
+          text: formData.option_c,
+          image: formData.option_c_image || null
+        },
+        D: {
+          text: formData.option_d,
+          image: formData.option_d_image || null
+        }
       } : null
     };
 
@@ -210,11 +260,17 @@ const QuestionManager: React.FC = () => {
       marks: question.marks,
       negative_marks: question.negative_marks,
       correct_answer: question.correct_answer,
-      option_a: question.options?.A || '',
-      option_b: question.options?.B || '',
-      option_c: question.options?.C || '',
-      option_d: question.options?.D || '',
-      explanation: question.explanation || ''
+      option_a: question.options?.A?.text || question.options?.A || '',
+      option_b: question.options?.B?.text || question.options?.B || '',
+      option_c: question.options?.C?.text || question.options?.C || '',
+      option_d: question.options?.D?.text || question.options?.D || '',
+      option_a_image: question.options?.A?.image || '',
+      option_b_image: question.options?.B?.image || '',
+      option_c_image: question.options?.C?.image || '',
+      option_d_image: question.options?.D?.image || '',
+      explanation: question.explanation || '',
+      question_image: question.question_image || '',
+      explanation_image: question.explanation_image || ''
     });
     setIsDialogOpen(true);
   };
@@ -231,7 +287,13 @@ const QuestionManager: React.FC = () => {
       option_b: '',
       option_c: '',
       option_d: '',
-      explanation: ''
+      option_a_image: '',
+      option_b_image: '',
+      option_c_image: '',
+      option_d_image: '',
+      explanation: '',
+      question_image: '',
+      explanation_image: ''
     });
   };
 
@@ -248,7 +310,9 @@ const QuestionManager: React.FC = () => {
         <QuestionActions
           onAddSample={addSampleImageQuestion}
           onAddQuestion={handleAddQuestion}
+          onDeleteAll={handleDeleteAll}
           loading={loading}
+          questions={questions}
         />
       </div>
 

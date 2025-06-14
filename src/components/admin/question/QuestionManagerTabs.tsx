@@ -1,8 +1,10 @@
 
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import ExcelQuestionUpload from '../ExcelQuestionUpload';
 import QuestionList from './QuestionList';
+import QuestionFilters from './QuestionFilters';
 
 interface Question {
   id: string;
@@ -23,6 +25,31 @@ interface QuestionManagerTabsProps {
 }
 
 const QuestionManagerTabs = ({ questions, onEdit, onDelete }: QuestionManagerTabsProps) => {
+  const [filters, setFilters] = useState({
+    subject: '',
+    questionType: '',
+    marks: ''
+  });
+
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      subject: '',
+      questionType: '',
+      marks: ''
+    });
+  };
+
+  const filteredQuestions = questions.filter(question => {
+    if (filters.subject && question.subject !== filters.subject) return false;
+    if (filters.questionType && question.question_type !== filters.questionType) return false;
+    if (filters.marks && question.marks.toString() !== filters.marks) return false;
+    return true;
+  });
+
   return (
     <Tabs defaultValue="manual" className="w-full">
       <TabsList>
@@ -33,12 +60,17 @@ const QuestionManagerTabs = ({ questions, onEdit, onDelete }: QuestionManagerTab
       <TabsContent value="manual">
         <Card>
           <CardHeader>
-            <CardTitle>Questions ({questions.length})</CardTitle>
+            <CardTitle>Questions ({filteredQuestions.length} of {questions.length})</CardTitle>
             <CardDescription>Manage all test questions</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            <QuestionFilters
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              onClearFilters={clearFilters}
+            />
             <QuestionList
-              questions={questions}
+              questions={filteredQuestions}
               onEdit={onEdit}
               onDelete={onDelete}
             />
