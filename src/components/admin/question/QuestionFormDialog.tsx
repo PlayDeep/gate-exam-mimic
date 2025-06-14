@@ -25,7 +25,13 @@ interface FormData {
   option_b: string;
   option_c: string;
   option_d: string;
+  option_a_image: string;
+  option_b_image: string;
+  option_c_image: string;
+  option_d_image: string;
   explanation: string;
+  question_image: string;
+  explanation_image: string;
 }
 
 interface QuestionFormDialogProps {
