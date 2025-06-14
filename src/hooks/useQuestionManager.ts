@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -139,16 +138,33 @@ export const useQuestionManager = () => {
 
     setLoading(true);
     try {
-      const { error } = await supabase
+      // First, delete all user answers to avoid foreign key constraint violation
+      console.log('useQuestionManager: Deleting all user answers first...');
+      const { error: answersError } = await supabase
+        .from('user_answers')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+
+      if (answersError) {
+        console.error('useQuestionManager: Error deleting user answers:', answersError);
+        throw answersError;
+      }
+
+      // Then delete all questions
+      console.log('useQuestionManager: Deleting all questions...');
+      const { error: questionsError } = await supabase
         .from('questions')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
 
-      if (error) throw error;
+      if (questionsError) {
+        console.error('useQuestionManager: Error deleting questions:', questionsError);
+        throw questionsError;
+      }
 
       toast({
         title: "Success",
-        description: "All questions deleted successfully!"
+        description: "All questions and related data deleted successfully!"
       });
       
       fetchQuestions();
