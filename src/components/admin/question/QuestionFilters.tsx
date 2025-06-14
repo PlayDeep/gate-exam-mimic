@@ -25,17 +25,29 @@ interface QuestionFiltersProps {
 const QuestionFilters = ({ filters, onFilterChange, onClearFilters }: QuestionFiltersProps) => {
   const hasActiveFilters = filters.subject || filters.questionType || filters.marks;
 
+  const handleSubjectChange = (value: string) => {
+    onFilterChange('subject', value === 'all' ? '' : value);
+  };
+
+  const handleQuestionTypeChange = (value: string) => {
+    onFilterChange('questionType', value === 'all' ? '' : value);
+  };
+
+  const handleMarksChange = (value: string) => {
+    onFilterChange('marks', value === 'all' ? '' : value);
+  };
+
   return (
     <div className="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
       <div className="flex items-center space-x-2">
         <span className="text-sm font-medium">Filters:</span>
         
-        <Select value={filters.subject} onValueChange={(value) => onFilterChange('subject', value)}>
+        <Select value={filters.subject || 'all'} onValueChange={handleSubjectChange}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="All Subjects" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Subjects</SelectItem>
+            <SelectItem value="all">All Subjects</SelectItem>
             {subjects.map((subject) => (
               <SelectItem key={subject.code} value={subject.code}>
                 {subject.name}
@@ -44,23 +56,23 @@ const QuestionFilters = ({ filters, onFilterChange, onClearFilters }: QuestionFi
           </SelectContent>
         </Select>
 
-        <Select value={filters.questionType} onValueChange={(value) => onFilterChange('questionType', value)}>
+        <Select value={filters.questionType || 'all'} onValueChange={handleQuestionTypeChange}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="All Types" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Types</SelectItem>
+            <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="MCQ">MCQ</SelectItem>
             <SelectItem value="NAT">NAT</SelectItem>
           </SelectContent>
         </Select>
 
-        <Select value={filters.marks} onValueChange={(value) => onFilterChange('marks', value)}>
+        <Select value={filters.marks || 'all'} onValueChange={handleMarksChange}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="All Marks" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Marks</SelectItem>
+            <SelectItem value="all">All Marks</SelectItem>
             <SelectItem value="1">1 Mark</SelectItem>
             <SelectItem value="2">2 Marks</SelectItem>
             <SelectItem value="3">3 Marks</SelectItem>
