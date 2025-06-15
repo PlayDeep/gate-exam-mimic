@@ -102,6 +102,11 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     clearAnswer(currentQuestion);
   };
 
+  // Create a wrapper function for marking the current question for review
+  const handleMarkForReview = () => {
+    toggleMarkForReview(currentQuestion);
+  };
+
   // Loading state
   if (isLoading || questions.length === 0) {
     return <ExamLoadingState subject={subject} />;
@@ -135,7 +140,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
       isLoading={isLoading}
       markedForReview={markedForReview}
       onAnswerChange={handleAnswerChange}
-      onMarkForReview={toggleMarkForReview}
+      onMarkForReview={handleMarkForReview}
       onClearResponse={handleClearResponse}
       onNext={handleNext}
       onPrevious={handlePrevious}
