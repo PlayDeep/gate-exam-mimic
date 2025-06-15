@@ -1,5 +1,4 @@
-
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,6 +56,8 @@ export const useExamLogic = ({
     sessionId, 
     isActive: !isLoading && sessionId !== '' 
   });
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Check authentication
   useEffect(() => {
@@ -267,7 +268,26 @@ export const useExamLogic = ({
   };
 
   const handleSubmitExam = async () => {
-    if (!sessionId) return;
+    console.log('=== SUBMIT EXAM START ===');
+    console.log('Session ID:', sessionId);
+    console.log('Is Submitting:', isSubmitting);
+    
+    if (!sessionId) {
+      console.error('No session ID found');
+      toast({
+        title: "Error",
+        description: "No active session found. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (isSubmitting) {
+      console.log('Already submitting, preventing duplicate submission');
+      return;
+    }
+    
+    setIsSubmitting(true);
     
     // Stop current timer
     stopTimer();
@@ -345,6 +365,7 @@ export const useExamLogic = ({
       console.log('=== FINAL SCORE CALCULATION END ===');
       
       // Submit test session with timestamp
+      console.log('Submitting test session...');
       await submitTestSession(sessionId, {
         end_time: new Date().toISOString(),
         answered_questions: answeredCount,
@@ -353,9 +374,16 @@ export const useExamLogic = ({
         time_taken: timeSpentMinutes
       });
       
+      console.log('Test session submitted successfully');
+      
       // Get all time data for results
       const questionTimeData = getAllTimeData();
       console.log('All time data being passed to results:', questionTimeData);
+      
+      toast({
+        title: "Test Submitted",
+        description: "Your test has been submitted successfully!",
+      });
       
       navigate('/results', { 
         state: { 
@@ -369,6 +397,8 @@ export const useExamLogic = ({
           questionTimeData: questionTimeData
         } 
       });
+      
+      console.log('=== SUBMIT EXAM SUCCESS ===');
     } catch (error) {
       console.error('Error submitting exam:', error);
       toast({
@@ -376,6 +406,8 @@ export const useExamLogic = ({
         description: "Failed to submit exam. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -429,6 +461,7 @@ export const useExamLogic = ({
     handleNext,
     handlePrevious,
     navigateToQuestion,
-    getTimeSpent
+    getTimeSpent,
+    isSubmitting
   };
 };

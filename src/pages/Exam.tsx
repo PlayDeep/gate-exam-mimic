@@ -40,7 +40,8 @@ const Exam = () => {
     handleNext,
     handlePrevious,
     navigateToQuestion,
-    getTimeSpent
+    getTimeSpent,
+    isSubmitting
   } = useExamLogic({
     subject,
     timeLeft,
@@ -102,6 +103,7 @@ const Exam = () => {
         onToggleFullscreen={toggleFullscreen}
         onOpenCalculator={openCalculator}
         onSubmitExam={handleSubmitExam}
+        isSubmitting={isSubmitting}
       />
 
       <div className="flex h-[calc(100vh-73px)]">

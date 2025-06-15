@@ -12,6 +12,7 @@ interface ExamHeaderProps {
   onToggleFullscreen: () => void;
   onOpenCalculator: () => void;
   onSubmitExam: () => void;
+  isSubmitting?: boolean;
 }
 
 const ExamHeader = ({
@@ -22,7 +23,8 @@ const ExamHeader = ({
   isFullscreen,
   onToggleFullscreen,
   onOpenCalculator,
-  onSubmitExam
+  onSubmitExam,
+  isSubmitting = false
 }: ExamHeaderProps) => {
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -66,8 +68,9 @@ const ExamHeader = ({
           <Button
             variant="destructive"
             onClick={onSubmitExam}
+            disabled={isSubmitting}
           >
-            Submit Test
+            {isSubmitting ? 'Submitting...' : 'Submit Test'}
           </Button>
         </div>
       </div>
