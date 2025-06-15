@@ -47,6 +47,14 @@ export const useSubmissionProcess = ({
     console.log('Has submitted:', hasSubmitted());
     console.log('Is submitting:', isSubmitting);
     console.log('Submission lock:', isLocked());
+    console.log('Session data:', {
+      sessionId,
+      questionsCount: questions.length,
+      answersCount: Object.keys(answers).length,
+      timeLeft,
+      subject,
+      timeDataCount: questionTimeData.length
+    });
 
     // Acquire lock to prevent concurrent submissions
     if (!acquireLock()) {
@@ -102,14 +110,20 @@ export const useSubmissionProcess = ({
       const results = calculateResults({ questions, answers, timeLeft });
       console.log('Results calculated:', results);
       
-      console.log('=== SUBMITTING TO DATABASE ===');
-      await submitTestSession(sessionId, {
+      // Prepare comprehensive submission data
+      const submissionData = {
         end_time: new Date().toISOString(),
         answered_questions: results.answeredQuestions,
         score: results.totalScore,
         percentage: results.percentage,
         time_taken: results.timeTakenInMinutes
-      });
+      };
+      
+      console.log('=== SUBMITTING TO DATABASE ===');
+      console.log('Submission data:', submissionData);
+      console.log('Question time data being stored:', questionTimeData);
+      
+      await submitTestSession(sessionId, submissionData);
 
       console.log('Database submission successful');
 
@@ -120,9 +134,13 @@ export const useSubmissionProcess = ({
         });
       }
 
-      // Navigate to results only if component is still mounted
+      // Navigate to results with all data
       if (isMounted()) {
-        navigateToResults(results);
+        console.log('Navigating to results with comprehensive data');
+        navigateToResults({
+          ...results,
+          questionTimeData
+        });
       }
       
     } catch (error) {

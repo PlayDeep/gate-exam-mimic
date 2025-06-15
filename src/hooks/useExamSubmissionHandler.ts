@@ -32,7 +32,7 @@ export const useExamSubmissionHandler = ({
   stopTimerForSubmission
 }: UseExamSubmissionHandlerProps) => {
   
-  // Use refs to prevent re-initialization on every render
+  // Stable refs to prevent recreation
   const sessionIdRef = useRef(sessionId);
   const questionsRef = useRef(questions);
   const subjectRef = useRef(subject);
@@ -40,55 +40,83 @@ export const useExamSubmissionHandler = ({
   
   // Only update refs when values actually change
   useEffect(() => {
-    sessionIdRef.current = sessionId;
+    if (sessionIdRef.current !== sessionId) {
+      console.log('ExamSubmissionHandler: Session ID changed from', sessionIdRef.current, 'to', sessionId);
+      sessionIdRef.current = sessionId;
+    }
   }, [sessionId]);
   
   useEffect(() => {
-    questionsRef.current = questions;
+    if (questionsRef.current !== questions) {
+      console.log('ExamSubmissionHandler: Questions changed, updating ref');
+      questionsRef.current = questions;
+    }
   }, [questions]);
   
   useEffect(() => {
-    subjectRef.current = subject;
+    if (subjectRef.current !== subject) {
+      console.log('ExamSubmissionHandler: Subject changed from', subjectRef.current, 'to', subject);
+      subjectRef.current = subject;
+    }
   }, [subject]);
   
   useEffect(() => {
     stopTimerRef.current = stopTimerForSubmission;
   }, [stopTimerForSubmission]);
 
-  // Create stable timer manager props
+  // Create stable timer manager props - only depend on essential values
   const timerManagerProps = useMemo(() => ({
     currentQuestion,
     isLoading,
-    questionsLength: questions.length,
-    sessionId,
+    questionsLength: questionsRef.current.length,
+    sessionId: sessionIdRef.current,
     isSubmitting
-  }), [currentQuestion, isLoading, questions.length, sessionId, isSubmitting]);
+  }), [currentQuestion, isLoading, isSubmitting]);
 
   const { getTimeSpent, getAllTimeData, cleanupTimers } = useExamTimerManager(timerManagerProps);
 
-  // Create stable submission props
-  const submissionProps = useMemo(() => ({
-    sessionId: sessionIdRef.current,
-    questions: questionsRef.current,
-    answers,
-    timeLeft,
-    subject: subjectRef.current,
-    questionTimeData: getAllTimeData()
-  }), [answers, timeLeft, getAllTimeData]);
+  // Create stable submission props with proper time data
+  const submissionProps = useMemo(() => {
+    const timeData = getAllTimeData();
+    console.log('ExamSubmissionHandler: Creating submission props with time data:', timeData);
+    
+    return {
+      sessionId: sessionIdRef.current,
+      questions: questionsRef.current,
+      answers,
+      timeLeft,
+      subject: subjectRef.current,
+      questionTimeData: timeData
+    };
+  }, [answers, timeLeft, getAllTimeData]);
 
   const { submitExam, isSubmitting: submissionInProgress } = useSimpleExamSubmission(submissionProps);
 
-  // Create stable submission callback
+  // Stable submission callback with comprehensive data logging
   const performSubmission = useCallback(async (source: string) => {
     console.log(`ExamSubmissionHandler: Starting submission from ${source}`);
+    console.log('ExamSubmissionHandler: Current submission state:', {
+      isMounted: isMountedRef.current,
+      submissionInProgress,
+      sessionId: sessionIdRef.current,
+      questionsCount: questionsRef.current.length,
+      answersCount: Object.keys(answers).length,
+      timeLeft,
+      subject: subjectRef.current
+    });
     
     if (!isMountedRef.current || submissionInProgress || !sessionIdRef.current || questionsRef.current.length === 0) {
       console.log('ExamSubmissionHandler: Submission conditions not met, aborting');
       return;
     }
     
+    // Get final time data before cleanup
+    const finalTimeData = getAllTimeData();
+    console.log('ExamSubmissionHandler: Final time data before submission:', finalTimeData);
+    
     // Stop all timers before submission
     if (stopTimerRef.current) {
+      console.log('ExamSubmissionHandler: Stopping timer for submission');
       stopTimerRef.current();
     }
     cleanupTimers();
@@ -98,10 +126,10 @@ export const useExamSubmissionHandler = ({
       console.log('ExamSubmissionHandler: Submission completed successfully');
     } catch (error) {
       console.error(`ExamSubmissionHandler: ${source} submission failed:`, error);
+      throw error; // Re-throw to allow proper error handling
     }
-  }, [submitExam, submissionInProgress, cleanupTimers, isMountedRef]);
+  }, [submitExam, submissionInProgress, cleanupTimers, isMountedRef, answers, timeLeft, getAllTimeData]);
 
-  // Create stable handlers
   const handleTimeUp = useCallback(async () => {
     console.log('ExamSubmissionHandler: Time up triggered');
     await performSubmission('time up');
@@ -126,7 +154,7 @@ export const useExamSubmissionHandler = ({
       console.log('ExamSubmissionHandler: Component unmounting, cleaning up timers');
       cleanupTimers();
     };
-  }, []); // Empty dependency array - only run on unmount
+  }, [cleanupTimers]); // Keep cleanupTimers as dependency
 
   return {
     handleTimeUp,
