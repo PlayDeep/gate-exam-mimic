@@ -25,12 +25,13 @@ export const useResultsData = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log('useResultsData: Loading results data');
+    console.log('useResultsData: Loading results data from location.state:', location.state);
     
     const loadResultsData = () => {
       try {
         let data = location.state;
         
+        // Enhanced validation for location.state
         if (!data?.answers || !data?.questions) {
           console.log('useResultsData: No valid data in location.state, checking sessionStorage...');
           const storedData = sessionStorage.getItem('examResults');
@@ -38,28 +39,51 @@ export const useResultsData = () => {
             try {
               data = JSON.parse(storedData);
               sessionStorage.removeItem('examResults');
-            } catch (error) {
-              console.error('useResultsData: Failed to parse stored exam results:', error);
-              setError('Failed to load stored results');
+              console.log('useResultsData: Successfully loaded data from sessionStorage');
+            } catch (parseError) {
+              console.error('useResultsData: Failed to parse stored exam results:', parseError);
+              setError('Failed to load stored results - corrupted data');
               setIsLoading(false);
               return;
             }
           }
         }
 
-        if (!data?.answers || !data?.questions || !Array.isArray(data.questions)) {
-          console.error('useResultsData: Missing or invalid required results data:', data);
-          setError('Invalid or missing exam results data');
+        // Enhanced data validation
+        if (!data) {
+          console.error('useResultsData: No data available from any source');
+          setError('No exam results data available');
           setIsLoading(false);
           return;
         }
 
-        const answers = typeof data.answers === 'object' && data.answers !== null ? data.answers : {};
-        const questions = Array.isArray(data.questions) ? data.questions : [];
+        if (!data.answers || typeof data.answers !== 'object') {
+          console.error('useResultsData: Invalid answers data:', data.answers);
+          setError('Invalid answers data format');
+          setIsLoading(false);
+          return;
+        }
+
+        if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
+          console.error('useResultsData: Invalid questions data:', data.questions);
+          setError('Invalid or missing questions data');
+          setIsLoading(false);
+          return;
+        }
+
+        const answers = data.answers;
+        const questions = data.questions;
         
-        if (questions.length === 0) {
-          console.error('useResultsData: No questions in results data');
-          setError('No questions found in results');
+        // Validate question structure
+        const hasValidQuestions = questions.every(q => 
+          q && 
+          typeof q === 'object' && 
+          (q.correct_answer !== undefined || q.correctAnswer !== undefined)
+        );
+
+        if (!hasValidQuestions) {
+          console.error('useResultsData: Questions missing required fields');
+          setError('Questions data is incomplete');
           setIsLoading(false);
           return;
         }
@@ -67,13 +91,17 @@ export const useResultsData = () => {
         const timeSpent = data.timeTaken || data.timeSpent || 0;
         let questionTimeData: Array<{ questionNumber: number; timeSpent: number }> = [];
         
+        // Enhanced validation for questionTimeData
         if (data.questionTimeData && Array.isArray(data.questionTimeData)) {
           questionTimeData = data.questionTimeData.filter(item => 
             typeof item === 'object' && 
             item !== null &&
             typeof item.questionNumber === 'number' && 
-            typeof item.timeSpent === 'number'
+            typeof item.timeSpent === 'number' &&
+            item.questionNumber > 0 &&
+            item.timeSpent >= 0
           );
+          console.log('useResultsData: Filtered question time data:', questionTimeData.length, 'valid entries');
         }
 
         const finalResultsData: ResultsData = {
@@ -92,18 +120,26 @@ export const useResultsData = () => {
         };
 
         console.log('useResultsData: Final results data prepared successfully');
+        console.log('useResultsData: Data summary:', {
+          hasScore: finalResultsData.score !== undefined,
+          hasPercentage: finalResultsData.percentage !== undefined,
+          answersCount: Object.keys(finalResultsData.answers).length,
+          questionsCount: finalResultsData.questions.length,
+          hasTimeData: finalResultsData.questionTimeData && finalResultsData.questionTimeData.length > 0
+        });
+        
         setResultsData(finalResultsData);
         setError(null);
       } catch (error) {
         console.error('useResultsData: Error loading results data:', error);
-        setError('Failed to load exam results');
+        setError('Failed to load exam results - unexpected error');
       } finally {
         setIsLoading(false);
       }
     };
 
     loadResultsData();
-  }, [location.state]); // Added location.state as dependency to re-run when navigation changes
+  }, [location.state]); // Fixed: Added location.state as dependency
 
   return { resultsData, isLoading, error };
 };

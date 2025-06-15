@@ -32,7 +32,7 @@ export const useResultsCalculator = ({
     console.log('Passed score:', passedScore);
     console.log('Passed percentage:', passedPercentage);
     
-    // Validate inputs
+    // Enhanced input validation
     if (!Array.isArray(questions) || questions.length === 0) {
       console.error('Invalid questions data:', questions);
       return {
@@ -61,16 +61,16 @@ export const useResultsCalculator = ({
 
     console.log('Max possible score:', maxScore);
 
-    // Process each question
+    // Process each question with enhanced logic
     questions.forEach((question: any, index: number) => {
       const questionNum = index + 1;
       const userAnswer = answersObj[questionNum];
       
-      // Normalize answers for comparison
+      // Normalize answers for comparison - consistent with submission logic
       const normalizedUserAnswer = userAnswer !== undefined && userAnswer !== '' ? String(userAnswer).trim() : '';
       const normalizedCorrectAnswer = String(question.correct_answer || question.correctAnswer || '').trim();
       
-      // Get question properties with defaults
+      // Get question properties with enhanced defaults
       const marks = typeof question.marks === 'number' ? question.marks : 1;
       const negativeMarks = typeof question.negative_marks === 'number' ? question.negative_marks : 
                            (question.question_type === 'MCQ' ? (marks === 1 ? 1/3 : 2/3) : 0);
@@ -155,7 +155,7 @@ export const useResultsCalculator = ({
     console.log('Final result:', result);
 
     return result;
-  }, [questions, answers]); // Removed passedScore and passedPercentage from dependencies as they're not needed for memoization
+  }, [questions, answers, passedScore, passedPercentage]); // Fixed: Added back all dependencies for proper memoization
 
   return results;
 };

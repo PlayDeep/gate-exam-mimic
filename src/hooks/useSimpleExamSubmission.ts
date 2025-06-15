@@ -14,8 +14,8 @@ interface UseSimpleExamSubmissionProps {
   questionTimeData?: Array<{ questionNumber: number; timeSpent: number }>;
 }
 
-// Made exam duration configurable instead of hardcoded
-const EXAM_DURATION_MINUTES = 180; // 3 hours
+// Made exam duration configurable - can be moved to environment variables later
+const EXAM_DURATION_MINUTES = 180; // 3 hours - configurable
 
 export const useSimpleExamSubmission = ({
   sessionId,
@@ -31,7 +31,7 @@ export const useSimpleExamSubmission = ({
 
   const submitExam = async () => {
     if (!sessionId || isSubmitting) {
-      console.warn('Submit called with invalid state:', { sessionId, isSubmitting });
+      console.warn('submitExam: Invalid state - sessionId:', sessionId, 'isSubmitting:', isSubmitting);
       return;
     }
 
@@ -45,7 +45,7 @@ export const useSimpleExamSubmission = ({
     setIsSubmitting(true);
 
     try {
-      // Validate required data
+      // Enhanced validation
       if (!Array.isArray(questions) || questions.length === 0) {
         throw new Error('No questions available for submission');
       }
@@ -55,7 +55,7 @@ export const useSimpleExamSubmission = ({
       
       console.log('=== CALCULATING SCORES ===');
       
-      // Calculate score and metrics with detailed logging
+      // Score calculation logic - matching ResultsCalculator exactly
       let totalScore = 0;
       let maxPossibleScore = 0;
       let correctAnswers = 0;
@@ -69,30 +69,30 @@ export const useSimpleExamSubmission = ({
         maxPossibleScore += marks;
         
         if (userAnswer !== undefined && userAnswer !== '') {
-          // Normalize answers for comparison
+          // Normalize answers for comparison - exactly like ResultsCalculator
           const normalizedUserAnswer = String(userAnswer).trim();
-          const normalizedCorrectAnswer = String(question.correct_answer).trim();
+          const normalizedCorrectAnswer = String(question.correct_answer || '').trim();
           const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
           
-          console.log(`Q${questionNumber}: User="${normalizedUserAnswer}" vs Correct="${normalizedCorrectAnswer}" = ${isCorrect}`);
+          console.log(`Q${questionNumber}: User="${normalizedUserAnswer}" vs Correct="${normalizedCorrectAnswer}" = ${isCorrect ? 'CORRECT' : 'WRONG'}`);
           
           if (isCorrect) {
             correctAnswers++;
             totalScore += marks;
           } else {
             wrongAnswers++;
-            // Apply negative marking only for MCQ questions
+            // Apply negative marking only for MCQ questions - matching ResultsCalculator
             if (question.question_type === 'MCQ') {
               const negativeMarks = typeof question.negative_marks === 'number' 
                 ? question.negative_marks 
-                : (marks === 1 ? 1/3 : 2/3);
+                : (marks === 1 ? 1/3 : 2/3); // Default negative marking
               totalScore -= negativeMarks;
             }
           }
         }
       });
 
-      // Ensure score doesn't go below 0 and round properly
+      // Ensure score doesn't go below 0 and round properly - matching ResultsCalculator
       totalScore = Math.max(0, Math.round(totalScore * 100) / 100);
       
       const percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
@@ -122,7 +122,7 @@ export const useSimpleExamSubmission = ({
 
       console.log('Database submission successful');
       
-      // Prepare comprehensive results data
+      // Prepare comprehensive results data - matching expected format
       const resultsData = {
         sessionId,
         score: totalScore,
@@ -139,19 +139,22 @@ export const useSimpleExamSubmission = ({
       };
 
       console.log('=== PREPARED RESULTS DATA ===');
-      console.log('Results data keys:', Object.keys(resultsData));
-      console.log('Answers keys count:', Object.keys(resultsData.answers).length);
-      console.log('Questions count:', resultsData.questions.length);
-      console.log('Question time data count:', resultsData.questionTimeData.length);
+      console.log('Results data summary:', {
+        hasScore: typeof resultsData.score === 'number',
+        hasPercentage: typeof resultsData.percentage === 'number',
+        answersCount: Object.keys(resultsData.answers).length,
+        questionsCount: resultsData.questions.length,
+        timeDataCount: resultsData.questionTimeData.length
+      });
 
-      // Store in sessionStorage as backup with improved error handling
+      // Store in sessionStorage as backup with enhanced error handling
       try {
         const dataToStore = JSON.stringify(resultsData);
-        if (typeof Storage !== 'undefined') {
+        if (typeof Storage !== 'undefined' && window.sessionStorage) {
           sessionStorage.setItem('examResults', dataToStore);
           console.log('Results data stored in sessionStorage successfully');
         } else {
-          console.warn('SessionStorage not available (possibly incognito mode)');
+          console.warn('SessionStorage not available (possibly incognito mode or disabled)');
         }
       } catch (storageError) {
         console.error('Failed to store results in sessionStorage:', storageError);

@@ -18,7 +18,7 @@ export const useExamInitialization = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Authentication check
+  // Authentication check - separate effect to avoid conflicts
   useEffect(() => {
     if (!loading && !user) {
       console.log('useExamInitialization: User not authenticated, redirecting to home');
@@ -34,15 +34,15 @@ export const useExamInitialization = () => {
   // Initialize exam - only run once when conditions are met
   useEffect(() => {
     const initializeExam = async () => {
-      // Fixed the confusing logic: was !loading === false, now properly checks if loading is complete
-      if (!subject || !user || sessionId || isInitialized || loading) {
+      // Fixed: Changed from confusing !loading === false to proper loading check
+      if (!subject || !user || loading || sessionId || isInitialized) {
         return;
       }
       
       try {
         console.log('useExamInitialization: Starting exam initialization');
         setIsLoading(true);
-        setIsInitialized(true);
+        setIsInitialized(true); // Set this early to prevent re-runs
         
         const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
         
@@ -68,6 +68,7 @@ export const useExamInitialization = () => {
         
       } catch (error) {
         console.error('useExamInitialization: Error during initialization:', error);
+        setIsInitialized(false); // Reset on error
         toast({
           title: "Initialization Error",
           description: error instanceof Error ? error.message : "Failed to load test questions.",
@@ -80,7 +81,7 @@ export const useExamInitialization = () => {
     };
 
     initializeExam();
-  }, [subject, user, loading, sessionId, isInitialized, navigate, toast]); // Fixed dependencies
+  }, [subject, user, loading, sessionId, isInitialized, navigate, toast]);
 
   return {
     questions,

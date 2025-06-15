@@ -21,9 +21,10 @@ interface ExamContainerProps {
 const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionId, subject }: ExamContainerProps) => {
   const navigate = useNavigate();
   
-  // Use refs to track initialization to prevent loops
+  // Use refs to prevent unnecessary re-initializations
   const isInitializedRef = useRef(false);
   const currentQuestionRef = useRef(1);
+  const timerCleanupRef = useRef<(() => void) | null>(null);
   
   const {
     timeLeft,
@@ -72,10 +73,10 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     onTimeUp: submitExam
   });
 
-  // Initialize with props - only once, using ref to prevent loops
+  // Initialize with props - only once to prevent loops
   useEffect(() => {
     if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current) {
-      console.log('ExamContainer: Setting initial data');
+      console.log('ExamContainer: Initializing with props data');
       setQuestions(initialQuestions);
       setSessionId(initialSessionId);
       setIsLoading(false);
@@ -83,61 +84,75 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     }
   }, [initialQuestions, initialSessionId, setQuestions, setSessionId, setIsLoading]);
 
-  // Start question timer - simplified logic to prevent overlapping timers
+  // Improved timer management - prevent overlapping timers
   useEffect(() => {
     if (!isLoading && questions.length > 0 && sessionId && !isSubmitting) {
-      // Only start timer if question actually changed
+      // Only manage timer if question actually changed
       if (currentQuestionRef.current !== currentQuestion) {
-        console.log('ExamContainer: Question changed, managing timer:', currentQuestion);
-        stopTimer(); // Stop any existing timer first
+        console.log('ExamContainer: Question changed from', currentQuestionRef.current, 'to', currentQuestion);
+        
+        // Clean up previous timer
+        if (timerCleanupRef.current) {
+          timerCleanupRef.current();
+        }
+        
+        // Stop any existing timer
+        stopTimer();
+        
+        // Start new timer
         startTimer(currentQuestion);
         currentQuestionRef.current = currentQuestion;
+        
+        // Store cleanup function
+        timerCleanupRef.current = () => {
+          stopTimer();
+          timerCleanupRef.current = null;
+        };
       }
     }
     
+    // Cleanup function
     return () => {
-      stopTimer();
+      if (timerCleanupRef.current) {
+        timerCleanupRef.current();
+      }
     };
   }, [currentQuestion, isLoading, questions.length, sessionId, isSubmitting, startTimer, stopTimer]);
 
-  // Handle question navigation with improved timer management
+  // Enhanced navigation handlers with better state management
   const handleQuestionNavigation = (newQuestion: number) => {
-    if (newQuestion !== currentQuestion && !isLoading && !isSubmitting) {
+    if (newQuestion !== currentQuestion && !isLoading && !isSubmitting && newQuestion >= 1 && newQuestion <= totalQuestions) {
       console.log('ExamContainer: Navigating from question', currentQuestion, 'to', newQuestion);
-      stopTimer();
       navigateToQuestion(newQuestion);
-      // Timer will be started by the useEffect above when currentQuestion changes
     }
   };
 
   const handleNext = () => {
     if (currentQuestion < totalQuestions && !isLoading && !isSubmitting) {
-      stopTimer();
       nextQuestion();
-      // Timer will be started by the useEffect above
     }
   };
 
   const handlePrevious = () => {
     if (currentQuestion > 1 && !isLoading && !isSubmitting) {
-      stopTimer();
       previousQuestion();
-      // Timer will be started by the useEffect above
     }
   };
 
-  // Handle answer change with better error handling
+  // Enhanced answer saving with better error handling
   const handleAnswerChange = async (questionId: number, answer: string) => {
     console.log(`ExamContainer: Answer changed for Q${questionId}:`, answer);
     updateAnswer(questionId, answer);
     
     if (sessionId && questions[questionId - 1]) {
       const question = questions[questionId - 1];
-      const isCorrect = String(answer).trim() === String(question.correct_answer).trim();
+      const normalizedAnswer = String(answer).trim();
+      const normalizedCorrectAnswer = String(question.correct_answer || question.correctAnswer || '').trim();
+      const isCorrect = normalizedAnswer === normalizedCorrectAnswer;
       
       let marksAwarded = 0;
       if (isCorrect) {
-        marksAwarded = question.marks;
+        marksAwarded = question.marks || 1;
       } else if (question.question_type === 'MCQ') {
         marksAwarded = -(question.negative_marks || 0);
       }
@@ -159,12 +174,12 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     }
   };
 
-  // Fullscreen handlers
+  // Fullscreen management
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
+      document.documentElement.requestFullscreen().catch(console.error);
     } else {
-      document.exitFullscreen();
+      document.exitFullscreen().catch(console.error);
     }
   };
 
@@ -181,16 +196,20 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
   };
 
-  // Handle submit with improved error handling
+  // Enhanced submit handler
   const handleSubmit = async () => {
     console.log('ExamContainer: Submit button clicked');
     
     if (!sessionId || questions.length === 0 || isSubmitting) {
-      console.log('ExamContainer: Invalid state for submission');
+      console.log('ExamContainer: Invalid state for submission:', { sessionId: !!sessionId, questionsLength: questions.length, isSubmitting });
       return;
     }
 
-    stopTimer();
+    // Clean up timer before submission
+    if (timerCleanupRef.current) {
+      timerCleanupRef.current();
+    }
+    
     console.log('ExamContainer: Proceeding with submission...');
     try {
       await submitExam();
