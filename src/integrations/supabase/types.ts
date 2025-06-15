@@ -95,16 +95,57 @@ export type Database = {
           },
         ]
       }
+      test_session_tracking: {
+        Row: {
+          activity_type: string
+          id: string
+          metadata: Json | null
+          question_number: number | null
+          session_id: string | null
+          timestamp: string
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          id?: string
+          metadata?: Json | null
+          question_number?: number | null
+          session_id?: string | null
+          timestamp?: string
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          id?: string
+          metadata?: Json | null
+          question_number?: number | null
+          session_id?: string | null
+          timestamp?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "test_session_tracking_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "test_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       test_sessions: {
         Row: {
           answered_questions: number | null
           end_time: string | null
           id: string
+          is_submitted: boolean
+          last_activity: string | null
           percentage: number | null
           score: number | null
           start_time: string
           status: string
           subject: string
+          submitted_at: string | null
           time_taken: number | null
           total_questions: number
           user_id: string
@@ -113,11 +154,14 @@ export type Database = {
           answered_questions?: number | null
           end_time?: string | null
           id?: string
+          is_submitted?: boolean
+          last_activity?: string | null
           percentage?: number | null
           score?: number | null
           start_time?: string
           status?: string
           subject: string
+          submitted_at?: string | null
           time_taken?: number | null
           total_questions: number
           user_id: string
@@ -126,11 +170,14 @@ export type Database = {
           answered_questions?: number | null
           end_time?: string | null
           id?: string
+          is_submitted?: boolean
+          last_activity?: string | null
           percentage?: number | null
           score?: number | null
           start_time?: string
           status?: string
           subject?: string
+          submitted_at?: string | null
           time_taken?: number | null
           total_questions?: number
           user_id?: string

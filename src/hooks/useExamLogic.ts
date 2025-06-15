@@ -4,8 +4,9 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRandomQuestionsForTest } from "@/services/questionService";
-import { createTestSession, updateTestSession, saveUserAnswer } from "@/services/testService";
+import { createTestSession, submitTestSession, saveUserAnswer, checkIfTestSubmitted } from "@/services/testService";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
+import { useRealTimeTracking } from "@/hooks/useRealTimeTracking";
 
 interface UseExamLogicProps {
   subject: string | undefined;
@@ -52,6 +53,10 @@ export const useExamLogic = ({
   const { toast } = useToast();
   const { user, loading } = useAuth();
   const { startTimer, stopTimer, getTimeSpent, getAllTimeData } = useQuestionTimer();
+  const { trackQuestionChange, trackAnswerUpdate } = useRealTimeTracking({ 
+    sessionId, 
+    isActive: !isLoading && sessionId !== '' 
+  });
 
   // Check authentication
   useEffect(() => {
@@ -65,6 +70,25 @@ export const useExamLogic = ({
       return;
     }
   }, [user, loading, navigate, toast]);
+
+  // Check if test is already submitted when session ID is available
+  useEffect(() => {
+    const checkSubmissionStatus = async () => {
+      if (sessionId) {
+        const isSubmitted = await checkIfTestSubmitted(sessionId);
+        if (isSubmitted) {
+          toast({
+            title: "Test Already Submitted",
+            description: "This test has already been submitted. You cannot make changes.",
+            variant: "destructive",
+          });
+          navigate('/previous-tests');
+        }
+      }
+    };
+
+    checkSubmissionStatus();
+  }, [sessionId, toast, navigate]);
 
   // Load questions and create test session
   useEffect(() => {
@@ -115,8 +139,9 @@ export const useExamLogic = ({
     if (!isLoading && totalQuestions > 0) {
       console.log('Starting timer for question:', currentQuestion);
       startTimer(currentQuestion);
+      trackQuestionChange(currentQuestion);
     }
-  }, [currentQuestion, isLoading, totalQuestions, startTimer]);
+  }, [currentQuestion, isLoading, totalQuestions, startTimer, trackQuestionChange]);
 
   // Timer effect
   useEffect(() => {
@@ -145,6 +170,19 @@ export const useExamLogic = ({
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [setIsFullscreen]);
 
+  // Prevent navigation away from test
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isLoading && sessionId) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isLoading, sessionId]);
+
   // Cleanup timer on unmount
   useEffect(() => {
     return () => {
@@ -159,6 +197,9 @@ export const useExamLogic = ({
     console.log('Answer Type:', typeof answer);
     
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
+    
+    // Track answer update in real-time
+    trackAnswerUpdate(questionId, answer);
     
     // Save answer to database with actual time spent
     if (sessionId && questions[questionId - 1]) {
@@ -303,13 +344,12 @@ export const useExamLogic = ({
       console.log('Answered Count:', answeredCount);
       console.log('=== FINAL SCORE CALCULATION END ===');
       
-      // Update test session
-      await updateTestSession(sessionId, {
+      // Submit test session with timestamp
+      await submitTestSession(sessionId, {
         end_time: new Date().toISOString(),
         answered_questions: answeredCount,
         score: totalScore,
         percentage: percentage,
-        status: 'completed',
         time_taken: timeSpentMinutes
       });
       

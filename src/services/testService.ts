@@ -12,6 +12,9 @@ export interface TestSession {
   percentage?: number;
   status: string;
   time_taken?: number;
+  submitted_at?: string;
+  is_submitted?: boolean;
+  last_activity?: string;
 }
 
 export interface UserAnswer {
@@ -38,7 +41,9 @@ export const createTestSession = async (subject: string, totalQuestions: number)
       user_id: user.id,
       subject,
       total_questions: totalQuestions,
-      status: 'in_progress'
+      status: 'in_progress',
+      is_submitted: false,
+      last_activity: new Date().toISOString()
     })
     .select('id')
     .single();
@@ -57,13 +62,54 @@ export const updateTestSession = async (
 ): Promise<void> => {
   const { error } = await supabase
     .from('test_sessions')
-    .update(updates)
+    .update({
+      ...updates,
+      last_activity: new Date().toISOString()
+    })
     .eq('id', sessionId);
 
   if (error) {
     console.error('Error updating test session:', error);
     throw error;
   }
+};
+
+export const submitTestSession = async (
+  sessionId: string,
+  updates: Partial<TestSession>
+): Promise<void> => {
+  const submissionTime = new Date().toISOString();
+  
+  const { error } = await supabase
+    .from('test_sessions')
+    .update({
+      ...updates,
+      is_submitted: true,
+      submitted_at: submissionTime,
+      last_activity: submissionTime,
+      status: 'completed'
+    })
+    .eq('id', sessionId);
+
+  if (error) {
+    console.error('Error submitting test session:', error);
+    throw error;
+  }
+};
+
+export const checkIfTestSubmitted = async (sessionId: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('test_sessions')
+    .select('is_submitted')
+    .eq('id', sessionId)
+    .single();
+
+  if (error) {
+    console.error('Error checking test submission status:', error);
+    return false;
+  }
+
+  return data?.is_submitted || false;
 };
 
 export const saveUserAnswer = async (
