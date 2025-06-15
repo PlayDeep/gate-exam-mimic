@@ -1,3 +1,4 @@
+
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -225,6 +226,9 @@ const Results = () => {
           percentage={percentage}
           gradeInfo={gradeInfo}
           timeSpentFormatted={timeSpentFormatted}
+          totalTimeSpent={timeSpent}
+          totalQuestions={results.totalQuestions}
+          answers={answers}
         />
 
         <QuestionAnalysis
