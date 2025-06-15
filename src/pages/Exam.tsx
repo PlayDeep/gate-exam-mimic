@@ -8,6 +8,7 @@ import { getRandomQuestionsForTest } from "@/services/questionService";
 import { createTestSession } from "@/services/testService";
 import { useSimpleExamState } from "@/hooks/useSimpleExamState";
 import { useExamTimer } from "@/hooks/useExamTimer";
+import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 import { useSimpleExamSubmission } from "@/hooks/useSimpleExamSubmission";
 import { saveUserAnswer } from "@/services/testService";
 import ExamHeader from "@/components/exam/ExamHeader";
@@ -45,12 +46,20 @@ const Exam = () => {
     updateAnswer
   } = useSimpleExamState();
 
+  const { 
+    startTimer, 
+    stopTimer, 
+    getTimeSpent, 
+    getAllTimeData 
+  } = useQuestionTimer();
+
   const { submitExam, isSubmitting } = useSimpleExamSubmission({
     sessionId,
     questions,
     answers,
     timeLeft,
-    subject
+    subject,
+    questionTimeData: getAllTimeData()
   });
 
   const { formattedTime } = useExamTimer({
@@ -98,6 +107,9 @@ const Exam = () => {
         const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
         setSessionId(newSessionId);
         
+        // Start timer for first question
+        startTimer(1);
+        
       } catch (error) {
         console.error('Error initializing exam:', error);
         toast({
@@ -112,7 +124,32 @@ const Exam = () => {
     };
 
     initializeExam();
-  }, [subject, user, navigate, toast, setIsLoading, setQuestions, setSessionId]);
+  }, [subject, user, navigate, toast, setIsLoading, setQuestions, setSessionId, startTimer]);
+
+  // Handle question navigation with timer
+  const handleQuestionNavigation = (newQuestion: number) => {
+    if (newQuestion !== currentQuestion) {
+      stopTimer();
+      navigateToQuestion(newQuestion);
+      startTimer(newQuestion);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentQuestion < totalQuestions) {
+      stopTimer();
+      nextQuestion();
+      startTimer(currentQuestion + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestion > 1) {
+      stopTimer();
+      previousQuestion();
+      startTimer(currentQuestion - 1);
+    }
+  };
 
   // Handle answer change
   const handleAnswerChange = async (questionId: number, answer: string) => {
@@ -136,7 +173,7 @@ const Exam = () => {
           answer,
           isCorrect,
           marksAwarded,
-          30 // Simple time tracking
+          getTimeSpent(questionId)
         );
       } catch (error) {
         console.error('Error saving answer:', error);
@@ -165,6 +202,13 @@ const Exam = () => {
   const openCalculator = () => {
     window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
   };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      stopTimer();
+    };
+  }, [stopTimer]);
 
   if (isLoading) {
     return (
@@ -213,7 +257,6 @@ const Exam = () => {
             <QuestionContent
               question={currentQuestionData}
               currentQuestion={currentQuestion}
-              timeSpent={0}
               answer={answers[currentQuestion] || ''}
               onAnswerChange={handleAnswerChange}
             />
@@ -226,8 +269,8 @@ const Exam = () => {
             markedForReview={markedForReview}
             onMarkForReview={toggleMarkForReview}
             onClearResponse={clearAnswer}
-            onNext={nextQuestion}
-            onPrevious={previousQuestion}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
           />
         </div>
 
@@ -238,7 +281,7 @@ const Exam = () => {
           currentQuestion={currentQuestion}
           answers={answers}
           markedForReview={markedForReview}
-          onNavigateToQuestion={navigateToQuestion}
+          onNavigateToQuestion={handleQuestionNavigation}
         />
       </div>
     </div>

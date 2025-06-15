@@ -1,15 +1,17 @@
 
 import { useState } from 'react';
-import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
-import { submitTestSession } from "@/services/testService";
+import { useNavigate } from 'react-router-dom';
+import { Question } from '@/services/questionService';
+import { submitTestSession } from '@/services/testService';
+import { useToast } from '@/hooks/use-toast';
 
 interface UseSimpleExamSubmissionProps {
   sessionId: string;
-  questions: any[];
+  questions: Question[];
   answers: Record<number, string>;
   timeLeft: number;
-  subject: string | undefined;
+  subject?: string;
+  questionTimeData?: Array<{ questionNumber: number; timeSpent: number }>;
 }
 
 export const useSimpleExamSubmission = ({
@@ -17,80 +19,92 @@ export const useSimpleExamSubmission = ({
   questions,
   answers,
   timeLeft,
-  subject
+  subject,
+  questionTimeData = []
 }: UseSimpleExamSubmissionProps) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const submitExam = async () => {
-    if (!sessionId || isSubmitting) {
-      return;
-    }
+    if (!sessionId || isSubmitting) return;
 
+    console.log('Starting exam submission...');
     setIsSubmitting(true);
-    console.log('Submitting exam...');
 
     try {
-      const timeSpentMinutes = Math.floor((180 * 60 - timeLeft) / 60);
-      const answeredCount = Object.keys(answers).length;
+      const totalQuestions = questions.length;
+      const answeredQuestions = Object.keys(answers).length;
       
       // Calculate score
       let totalScore = 0;
-      let correctAnswers = 0;
-      let wrongAnswers = 0;
+      let maxPossibleScore = 0;
       
       questions.forEach((question, index) => {
-        const questionNum = index + 1;
-        const userAnswer = answers[questionNum];
+        const questionNumber = index + 1;
+        const userAnswer = answers[questionNumber];
+        maxPossibleScore += question.marks;
         
-        if (!userAnswer) return;
-        
-        const isCorrect = String(userAnswer).trim() === String(question.correct_answer).trim();
-        
-        if (isCorrect) {
-          correctAnswers++;
-          totalScore += question.marks;
-        } else {
-          wrongAnswers++;
-          if (question.question_type === 'MCQ') {
+        if (userAnswer) {
+          const isCorrect = String(userAnswer).trim() === String(question.correct_answer).trim();
+          if (isCorrect) {
+            totalScore += question.marks;
+          } else if (question.question_type === 'MCQ') {
             totalScore -= (question.negative_marks || 0);
           }
         }
       });
+
+      // Ensure score doesn't go below 0
+      totalScore = Math.max(0, totalScore);
+      const percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
       
-      const percentage = questions.length > 0 ? (correctAnswers / questions.length) * 100 : 0;
-      
+      // Calculate time taken (3 hours - time left)
+      const totalTimeInSeconds = 180 * 60; // 3 hours
+      const timeTakenInSeconds = totalTimeInSeconds - timeLeft;
+      const timeTakenInMinutes = Math.round(timeTakenInSeconds / 60);
+
+      console.log('Submitting with score:', totalScore, 'percentage:', percentage, 'time:', timeTakenInMinutes);
+
       await submitTestSession(sessionId, {
         end_time: new Date().toISOString(),
-        answered_questions: answeredCount,
+        answered_questions: answeredQuestions,
         score: totalScore,
         percentage: percentage,
-        time_taken: timeSpentMinutes
+        time_taken: timeTakenInMinutes
       });
+
+      console.log('Exam submitted successfully');
+      
+      // Store results in sessionStorage for the results page
+      const resultData = {
+        sessionId,
+        score: totalScore,
+        maxScore: maxPossibleScore,
+        percentage,
+        answeredQuestions,
+        totalQuestions,
+        timeTaken: timeTakenInMinutes,
+        answers,
+        questions,
+        subject: subject || 'Unknown',
+        questionTimeData: questionTimeData || []
+      };
+      
+      sessionStorage.setItem('examResults', JSON.stringify(resultData));
       
       toast({
-        title: "Test Submitted",
-        description: "Your test has been submitted successfully!",
+        title: "Exam Submitted",
+        description: "Your test has been submitted successfully.",
       });
-      
-      navigate('/results', { 
-        state: { 
-          sessionId,
-          answers, 
-          questions, 
-          timeSpent: timeSpentMinutes,
-          subject,
-          score: totalScore,
-          percentage: percentage
-        } 
-      });
-      
+
+      // Navigate to results
+      navigate('/results');
     } catch (error) {
       console.error('Error submitting exam:', error);
       toast({
-        title: "Error",
-        description: "Failed to submit exam. Please try again.",
+        title: "Submission Error", 
+        description: "Failed to submit the test. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -98,8 +112,5 @@ export const useSimpleExamSubmission = ({
     }
   };
 
-  return {
-    submitExam,
-    isSubmitting
-  };
+  return { submitExam, isSubmitting };
 };

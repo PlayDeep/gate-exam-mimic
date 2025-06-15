@@ -6,7 +6,6 @@ import { Question } from "@/services/questionService";
 interface QuestionContentProps {
   question: Question;
   currentQuestion: number;
-  timeSpent: number;
   answer: string;
   onAnswerChange: (questionId: number, answer: string) => void;
 }
@@ -14,7 +13,6 @@ interface QuestionContentProps {
 const QuestionContent = ({
   question,
   currentQuestion,
-  timeSpent,
   answer,
   onAnswerChange
 }: QuestionContentProps) => {
@@ -103,9 +101,6 @@ const QuestionContent = ({
                   </Badge>
                   <Badge variant="outline">
                     {question.subject}
-                  </Badge>
-                  <Badge variant="outline" className="bg-blue-50">
-                    Time: {Math.floor(timeSpent / 60)}m {timeSpent % 60}s
                   </Badge>
                 </div>
                 
