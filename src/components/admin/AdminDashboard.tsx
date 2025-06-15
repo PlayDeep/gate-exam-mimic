@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,30 +26,36 @@ const AdminDashboard: React.FC = () => {
     try {
       console.log('Fetching dashboard stats...');
       
-      // Fetch users count
-      const { data: users, error: usersError } = await supabase
+      // Fetch users count using count query
+      const { count: usersCount, error: usersError } = await supabase
         .from('profiles')
-        .select('id', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true });
 
-      // Fetch questions count
-      const { data: questions, error: questionsError } = await supabase
+      // Fetch questions count using count query
+      const { count: questionsCount, error: questionsError } = await supabase
         .from('questions')
-        .select('id', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true });
 
-      // Fetch completed tests count
-      const { data: completedTests, error: testsError } = await supabase
+      // Fetch completed tests count using count query
+      const { count: completedTestsCount, error: testsError } = await supabase
         .from('test_sessions')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'completed');
 
-      if (usersError) console.error('Error fetching users:', usersError);
-      if (questionsError) console.error('Error fetching questions:', questionsError);
-      if (testsError) console.error('Error fetching tests:', testsError);
+      if (usersError) {
+        console.error('Error fetching users count:', usersError);
+      }
+      if (questionsError) {
+        console.error('Error fetching questions count:', questionsError);
+      }
+      if (testsError) {
+        console.error('Error fetching tests count:', testsError);
+      }
 
       const newStats = {
-        totalUsers: users?.length || 0,
-        totalQuestions: questions?.length || 0,
-        testsCompleted: completedTests?.length || 0
+        totalUsers: usersCount || 0,
+        totalQuestions: questionsCount || 0,
+        testsCompleted: completedTestsCount || 0
       };
 
       console.log('Dashboard stats:', newStats);
