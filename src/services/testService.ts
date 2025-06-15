@@ -119,6 +119,38 @@ export const getUserTests = async (): Promise<TestSession[]> => {
   return data || [];
 };
 
+// Add the missing exports that other files are trying to import
+export const getUserTestSessions = async (): Promise<TestSession[]> => {
+  return getUserTests();
+};
+
+export const getTestSessionDetails = async (sessionId: string) => {
+  console.log('Getting test session details for:', sessionId);
+  
+  const { data: session, error: sessionError } = await supabase
+    .from('test_sessions')
+    .select('*')
+    .eq('id', sessionId)
+    .single();
+
+  if (sessionError) {
+    console.error('Error fetching session:', sessionError);
+    throw sessionError;
+  }
+
+  const { data: answers, error: answersError } = await supabase
+    .from('user_answers')
+    .select('*')
+    .eq('session_id', sessionId);
+
+  if (answersError) {
+    console.error('Error fetching answers:', answersError);
+    throw answersError;
+  }
+
+  return { session, answers };
+};
+
 export const deleteTestSession = async (sessionId: string): Promise<void> => {
   console.log('Deleting test session:', sessionId);
   

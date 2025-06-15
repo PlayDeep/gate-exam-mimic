@@ -1,187 +1,112 @@
-
-import { useEffect } from 'react';
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "./use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useQuestionTimer } from "@/hooks/useQuestionTimer";
-import { useRealTimeTracking } from "@/hooks/useRealTimeTracking";
-import { useExamInitialization } from "@/hooks/useExamInitialization";
-import { useExamSubmission } from "@/hooks/useExamSubmission";
-import { useExamNavigation } from "@/hooks/useExamNavigation";
-import { useExamAnswers } from "@/hooks/useExamAnswers";
+// Removed the useExamInitialization import since it was deleted
+import { useExamAnswers } from "./useExamAnswers";
+import { useExamTimer } from "./useExamTimer";
+import { useExamNavigation } from "./useExamNavigation";
+import { useExamSubmission } from "./useExamSubmission";
+import { Question } from "@/types/question";
 
-interface UseExamLogicProps {
-  subject: string | undefined;
-  timeLeft: number;
-  setTimeLeft: (value: number | ((prev: number) => number)) => void;
-  currentQuestion: number;
-  setCurrentQuestion: (value: number) => void;
-  answers: Record<number, string>;
-  setAnswers: (value: Record<number, string> | ((prev: Record<number, string>) => Record<number, string>)) => void;
-  markedForReview: Set<number>;
-  setMarkedForReview: (value: Set<number> | ((prev: Set<number>) => Set<number>)) => void;
-  isFullscreen: boolean;
-  setIsFullscreen: (value: boolean) => void;
-  questions: any[];
-  setQuestions: (value: any[]) => void;
-  sessionId: string;
-  setSessionId: (value: string) => void;
-  isLoading: boolean;
-  setIsLoading: (value: boolean) => void;
-  totalQuestions: number;
-}
+export const useExamLogic = (
+  subject: string,
+  totalQuestions: number,
+  questions: Question[]
+) => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-export const useExamLogic = ({
-  subject,
-  timeLeft,
-  setTimeLeft,
-  currentQuestion,
-  setCurrentQuestion,
-  answers,
-  setAnswers,
-  markedForReview,
-  setMarkedForReview,
-  isFullscreen,
-  setIsFullscreen,
-  questions,
-  setQuestions,
-  sessionId,
-  setSessionId,
-  isLoading,
-  setIsLoading,
-  totalQuestions
-}: UseExamLogicProps) => {
-  const { user, loading } = useAuth();
-  const { startTimer, stopTimer, getTimeSpent } = useQuestionTimer();
-  
-  // Only initialize real-time tracking when we have a valid session and exam is loaded
-  const { trackQuestionChange } = useRealTimeTracking({ 
-    sessionId, 
-    isActive: !isLoading && sessionId !== '' && totalQuestions > 0 
-  });
-
-  // Initialize exam (authentication, questions loading, session creation)
-  useExamInitialization({
-    subject,
-    user,
-    loading,
-    sessionId,
-    setSessionId,
-    isLoading,
-    setIsLoading,
-    setQuestions
-  });
-
-  // Handle exam submission
-  const { handleSubmitExam, isSubmitting } = useExamSubmission({
-    sessionId,
-    user,
-    questions,
-    answers,
-    timeLeft,
-    totalQuestions,
-    subject
-  });
-
-  // Handle navigation
-  const { handleNext, handlePrevious, navigateToQuestion } = useExamNavigation({
-    currentQuestion,
-    setCurrentQuestion,
-    totalQuestions,
-    isLoading
-  });
-
-  // Handle answers and marking for review
-  const { handleAnswerChange, handleMarkForReview } = useExamAnswers({
-    sessionId,
-    questions,
+  const {
     answers,
     setAnswers,
-    markedForReview,
-    setMarkedForReview,
-    isLoading
-  });
+    handleAnswerSelect,
+    clearAnswer,
+    getAnsweredCount
+  } = useExamAnswers();
 
-  // Start timer for first question when exam loads and handle question changes
-  useEffect(() => {
-    if (!isLoading && totalQuestions > 0 && currentQuestion > 0) {
-      console.log('Starting timer for question:', currentQuestion);
-      startTimer(currentQuestion);
-      
-      // Only track question changes if we have a valid session
-      if (sessionId) {
-        trackQuestionChange(currentQuestion);
-      }
-    }
-  }, [currentQuestion, isLoading, totalQuestions, startTimer, trackQuestionChange, sessionId]);
+  const {
+    timeRemaining,
+    timeSpent,
+    startTimer,
+    stopTimer,
+    isTimeUp
+  } = useExamTimer(totalQuestions * 3);
 
-  // Timer effect
+  const {
+    currentQuestionIndex,
+    setCurrentQuestionIndex,
+    nextQuestion,
+    previousQuestion,
+    goToQuestion
+  } = useExamNavigation(questions.length);
+
+  const {
+    isSubmitting,
+    handleSubmit
+  } = useExamSubmission(sessionId, answers, questions, timeSpent);
+
+  // Initialize the exam when component mounts
   useEffect(() => {
-    if (isLoading || !sessionId) return;
-    
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          handleSubmitExam();
-          return 0;
-        }
-        return prev - 1;
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to take the test.",
+        variant: "destructive",
       });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [isLoading, sessionId, setTimeLeft, handleSubmitExam]);
-
-  // Fullscreen effect
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, [setIsFullscreen]);
-
-  // Prevent navigation away from test
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!isLoading && sessionId) {
-        e.preventDefault();
-        e.returnValue = '';
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [isLoading, sessionId]);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      stopTimer();
-    };
-  }, [stopTimer]);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen();
-    } else {
-      document.exitFullscreen();
+      navigate('/');
+      return;
     }
-  };
 
-  const openCalculator = () => {
-    window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
-  };
+    if (questions.length === 0) {
+      toast({
+        title: "No Questions",
+        description: "No questions available for this subject.",
+        variant: "destructive",
+      });
+      navigate('/');
+      return;
+    }
+
+    // Simple initialization without the complex hook
+    setIsLoading(false);
+    startTimer();
+  }, [user, questions, navigate, toast, startTimer]);
+
+  // Handle time up
+  useEffect(() => {
+    if (isTimeUp && sessionId && !isSubmitting) {
+      handleSubmit();
+    }
+  }, [isTimeUp, sessionId, isSubmitting, handleSubmit]);
 
   return {
-    handleAnswerChange,
-    handleMarkForReview,
-    handleSubmitExam,
-    toggleFullscreen,
-    openCalculator,
-    handleNext,
-    handlePrevious,
-    navigateToQuestion,
-    getTimeSpent,
-    isSubmitting
+    // State
+    sessionId,
+    currentQuestionIndex,
+    isLoading,
+    isSubmitting,
+    
+    // Timer
+    timeRemaining,
+    timeSpent,
+    isTimeUp,
+    
+    // Answers
+    answers,
+    handleAnswerSelect,
+    clearAnswer,
+    getAnsweredCount,
+    
+    // Navigation
+    nextQuestion,
+    previousQuestion,
+    goToQuestion,
+    
+    // Actions
+    handleSubmit
   };
 };
