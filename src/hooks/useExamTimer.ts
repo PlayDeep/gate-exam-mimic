@@ -1,5 +1,4 @@
-
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 
 interface UseExamTimerProps {
   timeLeft: number;
@@ -17,14 +16,32 @@ export const useExamTimer = ({
   onTimeUp
 }: UseExamTimerProps) => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const onTimeUpRef = useRef(onTimeUp);
+
+  // Keep onTimeUp reference current to avoid stale closures
+  useEffect(() => {
+    onTimeUpRef.current = onTimeUp;
+  }, [onTimeUp]);
+
+  const handleTimeUp = useCallback(() => {
+    console.log('Timer: Time is up, calling onTimeUp callback');
+    onTimeUpRef.current();
+  }, []);
 
   useEffect(() => {
-    if (isLoading || !sessionId) return;
+    // Don't start timer if loading or no session
+    if (isLoading || !sessionId) {
+      console.log('Timer: Not starting - isLoading:', isLoading, 'sessionId:', !!sessionId);
+      return;
+    }
+    
+    console.log('Timer: Starting countdown timer with', timeLeft, 'seconds');
     
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
-          onTimeUp();
+          console.log('Timer: Time reached 0, triggering time up');
+          handleTimeUp();
           return 0;
         }
         return prev - 1;
@@ -33,10 +50,12 @@ export const useExamTimer = ({
 
     return () => {
       if (timerRef.current) {
+        console.log('Timer: Cleaning up timer');
         clearInterval(timerRef.current);
+        timerRef.current = null;
       }
     };
-  }, [isLoading, sessionId, setTimeLeft, onTimeUp]);
+  }, [isLoading, sessionId, setTimeLeft, handleTimeUp]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);

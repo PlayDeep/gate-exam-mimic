@@ -14,7 +14,6 @@ interface UseSimpleExamSubmissionProps {
   questionTimeData?: Array<{ questionNumber: number; timeSpent: number }>;
 }
 
-// Configurable exam duration - can be moved to environment variables later
 const EXAM_DURATION_MINUTES = 180; // 3 hours
 
 export const useSimpleExamSubmission = ({
@@ -30,8 +29,29 @@ export const useSimpleExamSubmission = ({
   const { toast } = useToast();
 
   const submitExam = async () => {
-    if (!sessionId || isSubmitting) {
-      console.warn('submitExam: Invalid state - sessionId:', sessionId, 'isSubmitting:', isSubmitting);
+    // Enhanced validation at start
+    if (!sessionId) {
+      console.warn('submitExam: No sessionId provided');
+      toast({
+        title: "Submission Error",
+        description: "No active session found. Please restart the exam.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isSubmitting) {
+      console.warn('submitExam: Already submitting, ignoring duplicate call');
+      return;
+    }
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      console.error('submitExam: No questions available');
+      toast({
+        title: "Submission Error",
+        description: "No questions available for submission.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -45,17 +65,11 @@ export const useSimpleExamSubmission = ({
     setIsSubmitting(true);
 
     try {
-      // Enhanced validation
-      if (!Array.isArray(questions) || questions.length === 0) {
-        throw new Error('No questions available for submission');
-      }
-
       const totalQuestions = questions.length;
       const answeredQuestions = Object.keys(answers).length;
       
       console.log('=== CALCULATING SCORES ===');
       
-      // Score calculation logic - matching ResultsCalculator exactly
       let totalScore = 0;
       let maxPossibleScore = 0;
       let correctAnswers = 0;
@@ -64,12 +78,11 @@ export const useSimpleExamSubmission = ({
       questions.forEach((question, index) => {
         const questionNumber = index + 1;
         const userAnswer = answers[questionNumber];
-        const marks = typeof question.marks === 'number' ? question.marks : 1;
+        const marks = typeof question.marks === 'number' && question.marks > 0 ? question.marks : 1;
         
         maxPossibleScore += marks;
         
         if (userAnswer !== undefined && userAnswer !== '') {
-          // Normalize answers for comparison - exactly like ResultsCalculator
           const normalizedUserAnswer = String(userAnswer).trim();
           const normalizedCorrectAnswer = String(question.correct_answer || '').trim();
           const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
@@ -81,23 +94,19 @@ export const useSimpleExamSubmission = ({
             totalScore += marks;
           } else {
             wrongAnswers++;
-            // Apply negative marking only for MCQ questions - matching ResultsCalculator
             if (question.question_type === 'MCQ') {
-              const negativeMarks = typeof question.negative_marks === 'number' 
+              const negativeMarks = typeof question.negative_marks === 'number' && question.negative_marks >= 0
                 ? question.negative_marks 
-                : (marks === 1 ? 1/3 : 2/3); // Default negative marking
+                : (marks === 1 ? 1/3 : 2/3);
               totalScore -= negativeMarks;
             }
           }
         }
       });
 
-      // Ensure score doesn't go below 0 and round properly - matching ResultsCalculator
       totalScore = Math.max(0, Math.round(totalScore * 100) / 100);
-      
       const percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
       
-      // Calculate time taken using configurable duration
       const totalTimeInSeconds = EXAM_DURATION_MINUTES * 60;
       const timeTakenInSeconds = Math.max(0, totalTimeInSeconds - timeLeft);
       const timeTakenInMinutes = Math.round(timeTakenInSeconds / 60);
@@ -110,7 +119,6 @@ export const useSimpleExamSubmission = ({
       console.log('Wrong Answers:', wrongAnswers);
       console.log('Time Taken (minutes):', timeTakenInMinutes);
 
-      // Submit to database
       console.log('=== SUBMITTING TO DATABASE ===');
       await submitTestSession(sessionId, {
         end_time: new Date().toISOString(),
@@ -122,7 +130,6 @@ export const useSimpleExamSubmission = ({
 
       console.log('Database submission successful');
       
-      // Prepare comprehensive results data - matching expected format
       const resultsData = {
         sessionId,
         score: totalScore,
@@ -131,9 +138,9 @@ export const useSimpleExamSubmission = ({
         answeredQuestions,
         totalQuestions,
         timeTaken: timeTakenInMinutes,
-        timeSpent: timeTakenInMinutes, // For backward compatibility
-        answers: { ...answers }, // Create a copy to avoid reference issues
-        questions: [...questions], // Create a copy to avoid reference issues
+        timeSpent: timeTakenInMinutes,
+        answers: { ...answers },
+        questions: [...questions],
         subject: subject || 'Unknown',
         questionTimeData: questionTimeData.length > 0 ? [...questionTimeData] : []
       };
@@ -147,21 +154,18 @@ export const useSimpleExamSubmission = ({
         timeDataCount: resultsData.questionTimeData.length
       });
 
-      // Store in sessionStorage as backup with enhanced error handling
       try {
         const dataToStore = JSON.stringify(resultsData);
         if (typeof Storage !== 'undefined' && window.sessionStorage) {
           sessionStorage.setItem('examResults', dataToStore);
           console.log('Results data stored in sessionStorage successfully');
         } else {
-          console.warn('SessionStorage not available (possibly incognito mode or disabled)');
+          console.warn('SessionStorage not available');
         }
       } catch (storageError) {
         console.error('Failed to store results in sessionStorage:', storageError);
-        // Don't fail the submission for storage issues
       }
 
-      // Show success toast
       toast({
         title: "Exam Submitted Successfully",
         description: `Score: ${totalScore}/${maxPossibleScore} (${percentage}%)`,
@@ -169,10 +173,9 @@ export const useSimpleExamSubmission = ({
 
       console.log('=== NAVIGATING TO RESULTS ===');
       
-      // Navigate to results with complete data
       navigate('/results', {
         state: resultsData,
-        replace: true // Prevent going back to exam
+        replace: true
       });
 
       console.log('Navigation initiated to results page');
@@ -181,9 +184,11 @@ export const useSimpleExamSubmission = ({
       console.error('=== SUBMISSION ERROR ===');
       console.error('Error details:', error);
       
+      const errorMessage = error instanceof Error ? error.message : "Failed to submit the test. Please try again.";
+      
       toast({
         title: "Submission Failed", 
-        description: error instanceof Error ? error.message : "Failed to submit the test. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

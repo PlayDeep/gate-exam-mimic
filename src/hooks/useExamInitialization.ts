@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -12,55 +12,81 @@ export const useExamInitialization = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { toast } = useToast();
+  const initializationAttemptedRef = useRef(false);
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sessionId, setSessionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Authentication check - separate effect to avoid conflicts
+  // Authentication check - separate effect
   useEffect(() => {
-    if (!loading && !user) {
-      console.log('useExamInitialization: User not authenticated, redirecting to home');
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to take the test.",
-        variant: "destructive",
-      });
-      navigate('/');
+    if (!loading) {
+      if (!user) {
+        console.log('useExamInitialization: User not authenticated, redirecting to home');
+        toast({
+          title: "Authentication Required",
+          description: "Please log in to take the test.",
+          variant: "destructive",
+        });
+        navigate('/');
+        return;
+      }
+      
+      if (!subject) {
+        console.log('useExamInitialization: No subject provided, redirecting to home');
+        toast({
+          title: "Invalid Request",
+          description: "No subject specified for the test.",
+          variant: "destructive",
+        });
+        navigate('/');
+        return;
+      }
     }
-  }, [user, loading, navigate, toast]);
+  }, [user, loading, subject, navigate, toast]);
 
   // Initialize exam - only run once when conditions are met
   useEffect(() => {
     const initializeExam = async () => {
       // Check if we should initialize
-      if (!subject || !user || loading || sessionId || isInitialized) {
+      if (loading || !user || !subject || initializationAttemptedRef.current) {
         return;
       }
       
+      // Prevent multiple initialization attempts
+      initializationAttemptedRef.current = true;
+      
       try {
-        console.log('useExamInitialization: Starting exam initialization');
+        console.log('useExamInitialization: Starting exam initialization for subject:', subject);
         setIsLoading(true);
-        setIsInitialized(true); // Set this early to prevent re-runs
+        setError(null);
         
         const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
         
-        if (fetchedQuestions.length === 0) {
-          console.error('useExamInitialization: No questions found for subject:', subject);
-          toast({
-            title: "No Questions Available",
-            description: "No questions found for this subject.",
-            variant: "destructive",
-          });
-          navigate('/');
-          return;
+        if (!Array.isArray(fetchedQuestions) || fetchedQuestions.length === 0) {
+          throw new Error(`No questions found for subject: ${subject}`);
+        }
+        
+        // Validate question structure
+        const invalidQuestions = fetchedQuestions.filter(q => 
+          !q || typeof q !== 'object' || !q.id || !q.question_text || q.correct_answer === undefined
+        );
+        
+        if (invalidQuestions.length > 0) {
+          console.error('useExamInitialization: Found invalid questions:', invalidQuestions.length);
+          throw new Error('Some questions have invalid data structure');
         }
         
         console.log('useExamInitialization: Questions loaded successfully:', fetchedQuestions.length);
         setQuestions(fetchedQuestions);
         
         const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
+        
+        if (!newSessionId || typeof newSessionId !== 'string') {
+          throw new Error('Failed to create valid test session');
+        }
+        
         console.log('useExamInitialization: Session created successfully:', newSessionId);
         setSessionId(newSessionId);
         
@@ -68,25 +94,36 @@ export const useExamInitialization = () => {
         
       } catch (error) {
         console.error('useExamInitialization: Error during initialization:', error);
-        setIsInitialized(false); // Reset on error to allow retry
+        
+        const errorMessage = error instanceof Error ? error.message : 'Failed to initialize exam';
+        setError(errorMessage);
+        
+        // Reset flag to allow retry
+        initializationAttemptedRef.current = false;
+        
         toast({
           title: "Initialization Error",
-          description: error instanceof Error ? error.message : "Failed to load test questions.",
+          description: errorMessage,
           variant: "destructive",
         });
-        navigate('/');
+        
+        // Delay navigation to allow user to see the error
+        setTimeout(() => {
+          navigate('/');
+        }, 3000);
       } finally {
         setIsLoading(false);
       }
     };
 
     initializeExam();
-  }, [subject, user, loading, sessionId, isInitialized, navigate, toast]);
+  }, [subject, user, loading, navigate, toast]);
 
   return {
     questions,
     sessionId,
     isLoading,
-    subject
+    subject,
+    error
   };
 };

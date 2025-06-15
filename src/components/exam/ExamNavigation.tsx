@@ -7,7 +7,7 @@ interface ExamNavigationProps {
   totalQuestions: number;
   isLoading: boolean;
   markedForReview: Set<number>;
-  onMarkForReview: (questionId: number) => void;
+  onMarkForReview: () => void;
   onClearResponse: () => void;
   onNext: () => void;
   onPrevious: () => void;
@@ -29,8 +29,9 @@ const ExamNavigation = ({
         <div className="flex space-x-2">
           <Button
             variant="outline"
-            onClick={() => onMarkForReview(currentQuestion)}
+            onClick={onMarkForReview}
             className={markedForReview.has(currentQuestion) ? 'bg-purple-50' : ''}
+            disabled={isLoading}
           >
             <Flag className="w-4 h-4 mr-1" />
             {markedForReview.has(currentQuestion) ? 'Unmark' : 'Mark'} for Review
@@ -39,6 +40,7 @@ const ExamNavigation = ({
           <Button
             variant="outline"
             onClick={onClearResponse}
+            disabled={isLoading}
           >
             Clear Response
           </Button>
