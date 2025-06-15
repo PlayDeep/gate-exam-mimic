@@ -155,7 +155,7 @@ export const useResultsCalculator = ({
     console.log('Final result:', result);
 
     return result;
-  }, [questions, answers, passedScore, passedPercentage]); // Memoize with dependencies
+  }, [questions, answers]); // Removed passedScore and passedPercentage from dependencies as they're not needed for memoization
 
   return results;
 };

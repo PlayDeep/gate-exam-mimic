@@ -14,6 +14,9 @@ interface UseSimpleExamSubmissionProps {
   questionTimeData?: Array<{ questionNumber: number; timeSpent: number }>;
 }
 
+// Made exam duration configurable instead of hardcoded
+const EXAM_DURATION_MINUTES = 180; // 3 hours
+
 export const useSimpleExamSubmission = ({
   sessionId,
   questions,
@@ -94,8 +97,8 @@ export const useSimpleExamSubmission = ({
       
       const percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
       
-      // Calculate time taken (total exam time - time left)
-      const totalTimeInSeconds = 180 * 60; // 3 hours in seconds
+      // Calculate time taken using configurable duration
+      const totalTimeInSeconds = EXAM_DURATION_MINUTES * 60;
       const timeTakenInSeconds = Math.max(0, totalTimeInSeconds - timeLeft);
       const timeTakenInMinutes = Math.round(timeTakenInSeconds / 60);
 
@@ -141,11 +144,15 @@ export const useSimpleExamSubmission = ({
       console.log('Questions count:', resultsData.questions.length);
       console.log('Question time data count:', resultsData.questionTimeData.length);
 
-      // Store in sessionStorage as backup with error handling
+      // Store in sessionStorage as backup with improved error handling
       try {
         const dataToStore = JSON.stringify(resultsData);
-        sessionStorage.setItem('examResults', dataToStore);
-        console.log('Results data stored in sessionStorage successfully');
+        if (typeof Storage !== 'undefined') {
+          sessionStorage.setItem('examResults', dataToStore);
+          console.log('Results data stored in sessionStorage successfully');
+        } else {
+          console.warn('SessionStorage not available (possibly incognito mode)');
+        }
       } catch (storageError) {
         console.error('Failed to store results in sessionStorage:', storageError);
         // Don't fail the submission for storage issues

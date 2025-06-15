@@ -1,5 +1,5 @@
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSimpleExamState } from "@/hooks/useSimpleExamState";
 import { useExamTimer } from "@/hooks/useExamTimer";
@@ -10,7 +10,6 @@ import ExamHeader from "./ExamHeader";
 import ExamNavigation from "./ExamNavigation";
 import ExamSidebar from "./ExamSidebar";
 import QuestionContent from "./QuestionContent";
-import { Button } from "@/components/ui/button";
 import { Question } from "@/services/questionService";
 
 interface ExamContainerProps {
@@ -21,6 +20,10 @@ interface ExamContainerProps {
 
 const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionId, subject }: ExamContainerProps) => {
   const navigate = useNavigate();
+  
+  // Use refs to track initialization to prevent loops
+  const isInitializedRef = useRef(false);
+  const currentQuestionRef = useRef(1);
   
   const {
     timeLeft,
@@ -69,35 +72,41 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     onTimeUp: submitExam
   });
 
-  // Initialize with props - only once
+  // Initialize with props - only once, using ref to prevent loops
   useEffect(() => {
-    if (initialQuestions.length > 0 && initialSessionId && !questions.length) {
+    if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current) {
       console.log('ExamContainer: Setting initial data');
       setQuestions(initialQuestions);
       setSessionId(initialSessionId);
       setIsLoading(false);
+      isInitializedRef.current = true;
     }
-  }, [initialQuestions, initialSessionId]); // Controlled dependencies
+  }, [initialQuestions, initialSessionId, setQuestions, setSessionId, setIsLoading]);
 
-  // Start question timer only after exam is fully initialized
+  // Start question timer - simplified logic to prevent overlapping timers
   useEffect(() => {
-    if (!isLoading && questions.length > 0 && sessionId && currentQuestion && !isSubmitting) {
-      console.log('ExamContainer: Starting timer for question:', currentQuestion);
-      startTimer(currentQuestion);
+    if (!isLoading && questions.length > 0 && sessionId && !isSubmitting) {
+      // Only start timer if question actually changed
+      if (currentQuestionRef.current !== currentQuestion) {
+        console.log('ExamContainer: Question changed, managing timer:', currentQuestion);
+        stopTimer(); // Stop any existing timer first
+        startTimer(currentQuestion);
+        currentQuestionRef.current = currentQuestion;
+      }
     }
     
     return () => {
       stopTimer();
     };
-  }, [isLoading, questions.length, sessionId, currentQuestion, isSubmitting]);
+  }, [currentQuestion, isLoading, questions.length, sessionId, isSubmitting, startTimer, stopTimer]);
 
-  // Handle question navigation with timer
+  // Handle question navigation with improved timer management
   const handleQuestionNavigation = (newQuestion: number) => {
     if (newQuestion !== currentQuestion && !isLoading && !isSubmitting) {
       console.log('ExamContainer: Navigating from question', currentQuestion, 'to', newQuestion);
       stopTimer();
       navigateToQuestion(newQuestion);
-      startTimer(newQuestion);
+      // Timer will be started by the useEffect above when currentQuestion changes
     }
   };
 
@@ -105,7 +114,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     if (currentQuestion < totalQuestions && !isLoading && !isSubmitting) {
       stopTimer();
       nextQuestion();
-      startTimer(currentQuestion + 1);
+      // Timer will be started by the useEffect above
     }
   };
 
@@ -113,11 +122,11 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     if (currentQuestion > 1 && !isLoading && !isSubmitting) {
       stopTimer();
       previousQuestion();
-      startTimer(currentQuestion - 1);
+      // Timer will be started by the useEffect above
     }
   };
 
-  // Handle answer change
+  // Handle answer change with better error handling
   const handleAnswerChange = async (questionId: number, answer: string) => {
     console.log(`ExamContainer: Answer changed for Q${questionId}:`, answer);
     updateAnswer(questionId, answer);
@@ -144,7 +153,8 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
         );
         console.log(`ExamContainer: Answer saved successfully for Q${questionId}`);
       } catch (error) {
-        console.error('ExamContainer: Error saving answer for Q${questionId}:', error);
+        console.error(`ExamContainer: Error saving answer for Q${questionId}:`, error);
+        // Don't throw error to user, just log it - exam can continue
       }
     }
   };
@@ -171,7 +181,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
   };
 
-  // Handle submit
+  // Handle submit with improved error handling
   const handleSubmit = async () => {
     console.log('ExamContainer: Submit button clicked');
     
@@ -182,7 +192,12 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
     stopTimer();
     console.log('ExamContainer: Proceeding with submission...');
-    await submitExam();
+    try {
+      await submitExam();
+    } catch (error) {
+      console.error('ExamContainer: Submission failed:', error);
+      // Error handling is done in the submission hook
+    }
   };
 
   // Loading state

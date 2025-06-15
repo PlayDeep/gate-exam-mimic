@@ -103,7 +103,7 @@ export const useResultsData = () => {
     };
 
     loadResultsData();
-  }, []); // Empty dependency array to prevent re-renders
+  }, [location.state]); // Added location.state as dependency to re-run when navigation changes
 
   return { resultsData, isLoading, error };
 };

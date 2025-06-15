@@ -31,10 +31,11 @@ export const useExamInitialization = () => {
     }
   }, [user, loading, navigate, toast]);
 
-  // Initialize exam - only run once
+  // Initialize exam - only run once when conditions are met
   useEffect(() => {
     const initializeExam = async () => {
-      if (!subject || !user || sessionId || isInitialized || !loading === false) {
+      // Fixed the confusing logic: was !loading === false, now properly checks if loading is complete
+      if (!subject || !user || sessionId || isInitialized || loading) {
         return;
       }
       
@@ -79,7 +80,7 @@ export const useExamInitialization = () => {
     };
 
     initializeExam();
-  }, [subject, user, loading]); // Controlled dependencies
+  }, [subject, user, loading, sessionId, isInitialized, navigate, toast]); // Fixed dependencies
 
   return {
     questions,
