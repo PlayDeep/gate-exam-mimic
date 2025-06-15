@@ -147,7 +147,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     if (sessionId && questions[questionId - 1]) {
       const question = questions[questionId - 1];
       const normalizedAnswer = String(answer).trim();
-      const normalizedCorrectAnswer = String(question.correct_answer || question.correctAnswer || '').trim();
+      const normalizedCorrectAnswer = String(question.correct_answer || '').trim();
       const isCorrect = normalizedAnswer === normalizedCorrectAnswer;
       
       let marksAwarded = 0;
