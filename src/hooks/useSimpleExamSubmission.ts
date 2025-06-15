@@ -36,36 +36,46 @@ export const useSimpleExamSubmission = ({
       const totalQuestions = questions.length;
       const answeredQuestions = Object.keys(answers).length;
       
-      // Calculate score
+      // Calculate score and other metrics
       let totalScore = 0;
       let maxPossibleScore = 0;
       
       questions.forEach((question, index) => {
         const questionNumber = index + 1;
         const userAnswer = answers[questionNumber];
-        maxPossibleScore += question.marks;
+        const marks = question.marks || 1;
+        maxPossibleScore += marks;
         
         if (userAnswer) {
           const isCorrect = String(userAnswer).trim() === String(question.correct_answer).trim();
           if (isCorrect) {
-            totalScore += question.marks;
+            totalScore += marks;
           } else if (question.question_type === 'MCQ') {
-            totalScore -= (question.negative_marks || 0);
+            const negativeMarks = question.negative_marks || (marks === 1 ? 1/3 : 2/3);
+            totalScore -= negativeMarks;
           }
         }
       });
 
       // Ensure score doesn't go below 0
       totalScore = Math.max(0, totalScore);
+      totalScore = Math.round(totalScore * 100) / 100; // Round to 2 decimal places
+      
       const percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
       
-      // Calculate time taken (3 hours - time left)
+      // Calculate time taken (3 hours - time left in seconds, convert to minutes)
       const totalTimeInSeconds = 180 * 60; // 3 hours
       const timeTakenInSeconds = totalTimeInSeconds - timeLeft;
       const timeTakenInMinutes = Math.round(timeTakenInSeconds / 60);
 
-      console.log('Submitting with score:', totalScore, 'percentage:', percentage, 'time:', timeTakenInMinutes);
+      console.log('Submitting with:', {
+        score: totalScore,
+        percentage,
+        timeTaken: timeTakenInMinutes,
+        answeredQuestions
+      });
 
+      // Submit to database
       await submitTestSession(sessionId, {
         end_time: new Date().toISOString(),
         answered_questions: answeredQuestions,
@@ -76,30 +86,28 @@ export const useSimpleExamSubmission = ({
 
       console.log('Exam submitted successfully');
       
-      // Store results in sessionStorage for the results page
-      const resultData = {
-        sessionId,
-        score: totalScore,
-        maxScore: maxPossibleScore,
-        percentage,
-        answeredQuestions,
-        totalQuestions,
-        timeTaken: timeTakenInMinutes,
-        answers,
-        questions,
-        subject: subject || 'Unknown',
-        questionTimeData: questionTimeData || []
-      };
-      
-      sessionStorage.setItem('examResults', JSON.stringify(resultData));
-      
       toast({
         title: "Exam Submitted",
         description: "Your test has been submitted successfully.",
       });
 
-      // Navigate to results
-      navigate('/results');
+      // Navigate to results with complete data
+      navigate('/results', {
+        state: {
+          sessionId,
+          score: totalScore,
+          maxScore: maxPossibleScore,
+          percentage,
+          answeredQuestions,
+          totalQuestions,
+          timeTaken: timeTakenInMinutes,
+          timeSpent: timeTakenInMinutes, // For backward compatibility
+          answers,
+          questions,
+          subject: subject || 'Unknown',
+          questionTimeData: questionTimeData || []
+        }
+      });
     } catch (error) {
       console.error('Error submitting exam:', error);
       toast({
