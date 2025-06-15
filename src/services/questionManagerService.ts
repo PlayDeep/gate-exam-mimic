@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import type { Question, FormData } from '@/types/question';
@@ -163,59 +162,83 @@ export const deleteQuestion = async (id: string): Promise<void> => {
   console.log('questionManagerService: Starting deletion process for question:', id);
   
   try {
-    // Use a more aggressive approach - delete using raw SQL function call
-    console.log('questionManagerService: Attempting to delete question and related data using RPC...');
-    
-    // First, let's try using a direct deletion approach with better error handling
-    const { error: deleteError } = await supabase.rpc('delete_question_with_answers', {
-      question_id: id
-    });
+    // First, check if there are any user answers for this question
+    console.log('questionManagerService: Checking for user answers for question:', id);
+    const { data: userAnswers, error: checkError } = await supabase
+      .from('user_answers')
+      .select('id')
+      .eq('question_id', id);
 
-    if (deleteError) {
-      console.error('questionManagerService: RPC delete failed, trying manual approach:', deleteError);
-      
-      // Fallback to manual deletion with more specific targeting
-      console.log('questionManagerService: Manually deleting user_answers first...');
-      
-      // Delete user answers with more specific conditions
+    if (checkError) {
+      console.error('questionManagerService: Error checking user answers:', checkError);
+      throw checkError;
+    }
+
+    console.log('questionManagerService: Found', userAnswers?.length || 0, 'user answers for question:', id);
+
+    // Delete all user answers for this specific question if any exist
+    if (userAnswers && userAnswers.length > 0) {
+      console.log('questionManagerService: Deleting', userAnswers.length, 'user answers for question:', id);
       const { error: answersError } = await supabase
         .from('user_answers')
         .delete()
         .eq('question_id', id);
 
       if (answersError) {
-        console.error('questionManagerService: Error deleting user answers:', answersError);
+        console.error('questionManagerService: Error deleting user answers for question:', answersError);
+        toast({
+          title: "Error",
+          description: `Failed to delete related user answers: ${answersError.message}`,
+          variant: "destructive"
+        });
         throw answersError;
       }
-
-      console.log('questionManagerService: User answers deleted, now deleting question...');
-      
-      // Now delete the question
-      const { error: questionError } = await supabase
-        .from('questions')
-        .delete()
-        .eq('id', id);
-
-      if (questionError) {
-        console.error('questionManagerService: Error deleting question:', questionError);
-        throw questionError;
-      }
+      console.log('questionManagerService: Successfully deleted user answers for question:', id);
     }
 
-    console.log('questionManagerService: Successfully deleted question and related data:', id);
+    // Now delete the question
+    console.log('questionManagerService: Deleting question:', id);
+    const { error: questionError } = await supabase
+      .from('questions')
+      .delete()
+      .eq('id', id);
+
+    if (questionError) {
+      console.error('questionManagerService: Error deleting question:', questionError);
+      
+      // Handle specific foreign key constraint errors
+      if (questionError.code === '23503') {
+        toast({
+          title: "Error",
+          description: "Cannot delete question: it has associated test answers. Please delete all test data first or contact support.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: `Failed to delete question: ${questionError.message}`,
+          variant: "destructive"
+        });
+      }
+      throw questionError;
+    }
+
+    console.log('questionManagerService: Successfully deleted question:', id);
     toast({
       title: "Success",
-      description: "Question and related data deleted successfully!"
+      description: "Question deleted successfully!"
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('questionManagerService: Unexpected error in deleteQuestion:', error);
     
-    // If all else fails, show a more specific error message
-    toast({
-      title: "Error",
-      description: "Failed to delete question. Please try deleting all questions instead, or contact support if the issue persists.",
-      variant: "destructive"
-    });
+    // Only show toast if we haven't already shown one
+    if (!error.code || error.code !== '23503') {
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while deleting the question. Please try again.",
+        variant: "destructive"
+      });
+    }
     throw error;
   }
 };
