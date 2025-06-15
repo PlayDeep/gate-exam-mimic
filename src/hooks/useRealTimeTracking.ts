@@ -23,9 +23,16 @@ interface TestSessionPayload {
 export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTrackingProps) => {
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const isInitializedRef = useRef<boolean>(false);
 
   useEffect(() => {
-    if (!sessionId || !isActive) return;
+    // Prevent multiple initializations
+    if (!sessionId || !isActive || isInitializedRef.current) {
+      return;
+    }
+
+    console.log('Initializing real-time tracking for session:', sessionId);
+    isInitializedRef.current = true;
 
     // Start session tracking
     trackActivity(sessionId, 'session_start');
@@ -33,9 +40,12 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
     // Start heartbeat
     heartbeatIntervalRef.current = startHeartbeat(sessionId);
 
-    // Set up real-time channel for monitoring
+    // Set up real-time channel for monitoring - create new channel instance
+    const channelName = `test_session_${sessionId}`;
+    console.log('Creating channel:', channelName);
+    
     channelRef.current = supabase
-      .channel(`test_session_${sessionId}`)
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -65,13 +75,23 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
         (payload) => {
           console.log('New tracking activity:', payload);
         }
-      )
-      .subscribe();
+      );
+
+    // Subscribe to the channel
+    console.log('Subscribing to channel...');
+    channelRef.current.subscribe((status) => {
+      console.log('Channel subscription status:', status);
+    });
 
     // Cleanup function
     return () => {
+      console.log('Cleaning up real-time tracking...');
+      isInitializedRef.current = false;
+      
       // Track session end
-      trackActivity(sessionId, 'session_end');
+      if (sessionId) {
+        trackActivity(sessionId, 'session_end');
+      }
       
       // Stop heartbeat
       if (heartbeatIntervalRef.current) {
@@ -81,20 +101,42 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
 
       // Unsubscribe from channel
       if (channelRef.current) {
+        console.log('Removing channel...');
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
   }, [sessionId, isActive]);
 
+  // Separate effect for cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log('Component unmounting, cleaning up...');
+      isInitializedRef.current = false;
+      
+      // Stop heartbeat
+      if (heartbeatIntervalRef.current) {
+        stopHeartbeat(heartbeatIntervalRef.current);
+        heartbeatIntervalRef.current = null;
+      }
+
+      // Unsubscribe from channel
+      if (channelRef.current) {
+        console.log('Removing channel on unmount...');
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, []);
+
   const trackQuestionChange = (questionNumber: number) => {
-    if (sessionId && isActive) {
+    if (sessionId && isActive && isInitializedRef.current) {
       trackActivity(sessionId, 'question_change', questionNumber);
     }
   };
 
   const trackAnswerUpdate = (questionNumber: number, answer: string) => {
-    if (sessionId && isActive) {
+    if (sessionId && isActive && isInitializedRef.current) {
       trackActivity(sessionId, 'answer_update', questionNumber, { answer });
     }
   };
