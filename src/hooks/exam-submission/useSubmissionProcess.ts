@@ -110,67 +110,40 @@ export const useSubmissionProcess = ({
       const results = calculateResults({ questions, answers, timeLeft });
       console.log('Results calculated:', results);
       
-      // Calculate comprehensive time metrics
-      const totalTimeFromQuestions = questionTimeData.reduce((sum, q) => sum + q.timeSpent, 0);
-      const averageTimePerQuestion = questionTimeData.length > 0 
-        ? Math.round(totalTimeFromQuestions / questionTimeData.length) 
-        : 0;
-      
-      const answeredQuestionsTime = questionTimeData.filter(q => 
-        answers[q.questionNumber] && answers[q.questionNumber].trim() !== ''
-      );
-      
-      const averageTimePerAnswered = answeredQuestionsTime.length > 0
-        ? Math.round(answeredQuestionsTime.reduce((sum, q) => sum + q.timeSpent, 0) / answeredQuestionsTime.length)
-        : 0;
-
-      // Prepare comprehensive submission data with enhanced analytics
+      // Prepare submission data with only valid database columns
       const submissionData = {
         end_time: new Date().toISOString(),
         answered_questions: results.answeredQuestions,
         score: results.totalScore,
         percentage: results.percentage,
-        time_taken: results.timeTakenInMinutes,
-        // Enhanced time analytics
-        total_time_on_questions: Math.round(totalTimeFromQuestions / 60), // in minutes
-        average_time_per_question: averageTimePerQuestion,
-        average_time_per_answered: averageTimePerAnswered,
-        questions_with_time_data: questionTimeData.length,
-        time_efficiency_score: results.timeTakenInMinutes > 0 
-          ? Math.round((results.answeredQuestions / results.timeTakenInMinutes) * 100) / 100 
-          : 0
+        time_taken: results.timeTakenInMinutes
       };
       
       console.log('=== SUBMITTING TO DATABASE ===');
-      console.log('Enhanced submission data:', submissionData);
-      console.log('Question time analytics being stored:', {
+      console.log('Submission data:', submissionData);
+      console.log('Question time analytics (not stored in DB):', {
         totalQuestions: questionTimeData.length,
         questionsWithData: questionTimeData.filter(q => q.timeSpent > 0).length,
-        totalTimeSpent: totalTimeFromQuestions,
-        averageTime: averageTimePerQuestion
+        totalTimeSpent: questionTimeData.reduce((sum, q) => sum + q.timeSpent, 0)
       });
       
       await submitTestSession(sessionId, submissionData);
 
-      console.log('Database submission successful with enhanced analytics');
+      console.log('Database submission successful');
 
       if (isMounted()) {
         toast({
           title: "Exam Submitted Successfully",
-          description: `Score: ${results.totalScore}/${results.maxPossibleScore} (${results.percentage}%) | Time: ${Math.round(totalTimeFromQuestions / 60)}m`,
+          description: `Score: ${results.totalScore}/${results.maxPossibleScore} (${results.percentage}%)`,
         });
       }
 
       // Navigate to results with comprehensive data
       if (isMounted()) {
-        console.log('Navigating to results with enhanced time analytics');
+        console.log('Navigating to results');
         navigateToResults({
           ...results,
-          questionTimeData,
-          totalTimeSpent: totalTimeFromQuestions,
-          averageTimePerQuestion,
-          averageTimePerAnswered,
-          timeEfficiency: submissionData.time_efficiency_score
+          questionTimeData
         });
       }
       
