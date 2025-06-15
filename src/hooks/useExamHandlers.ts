@@ -1,5 +1,5 @@
 
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { useExamTimer } from "@/hooks/useExamTimer";
 import { useExamAnswerHandler } from "@/hooks/useExamAnswerHandler";
 import { useExamNavigationHandler } from "@/hooks/useExamNavigationHandler";
@@ -58,19 +58,47 @@ export const useExamHandlers = (props: UseExamHandlersProps) => {
     isMountedRef
   } = props;
 
-  // Stable submission handler props - prevent re-creation on every render
-  const submissionHandlerProps = useMemo(() => ({
+  // Use refs for values that should remain stable across renders
+  const stablePropsRef = useRef({
     sessionId,
     questions,
+    subject,
+    updateAnswer,
+    clearAnswer,
+    toggleMarkForReview,
+    navigateToQuestion,
+    nextQuestion,
+    previousQuestion
+  });
+
+  // Update refs only when values actually change
+  useEffect(() => {
+    stablePropsRef.current = {
+      sessionId,
+      questions,
+      subject,
+      updateAnswer,
+      clearAnswer,
+      toggleMarkForReview,
+      navigateToQuestion,
+      nextQuestion,
+      previousQuestion
+    };
+  }, [sessionId, questions, subject, updateAnswer, clearAnswer, toggleMarkForReview, navigateToQuestion, nextQuestion, previousQuestion]);
+
+  // Memoize submission handler props with ultra-stable dependencies
+  const submissionHandlerProps = useMemo(() => ({
+    sessionId: stablePropsRef.current.sessionId,
+    questions: stablePropsRef.current.questions,
     answers,
     timeLeft,
-    subject,
+    subject: stablePropsRef.current.subject,
     currentQuestion,
     isLoading,
     isSubmitting,
     setIsSubmitting,
     isMountedRef
-  }), [sessionId, questions, answers, timeLeft, subject, currentQuestion, isLoading, isSubmitting, setIsSubmitting, isMountedRef]);
+  }), [answers, timeLeft, currentQuestion, isLoading, isSubmitting, setIsSubmitting, isMountedRef]);
 
   const {
     handleTimeUp,
@@ -90,38 +118,38 @@ export const useExamHandlers = (props: UseExamHandlersProps) => {
     onTimeUp: handleTimeUp
   });
 
-  // Stable answer handler props
+  // Stable answer handler props - use ref values
   const answerHandlerProps = useMemo(() => ({
-    sessionId,
-    questions,
-    updateAnswer,
+    sessionId: stablePropsRef.current.sessionId,
+    questions: stablePropsRef.current.questions,
+    updateAnswer: stablePropsRef.current.updateAnswer,
     getTimeSpent
-  }), [sessionId, questions, updateAnswer, getTimeSpent]);
+  }), [getTimeSpent]);
 
   const { handleAnswerChange } = useExamAnswerHandler(answerHandlerProps);
 
-  // Stable navigation handler props
+  // Stable navigation handler props - use ref values
   const navigationHandlerProps = useMemo(() => ({
     currentQuestion,
     totalQuestions,
     isLoading,
     isSubmitting: submissionInProgress,
-    navigateToQuestion,
-    nextQuestion,
-    previousQuestion
-  }), [currentQuestion, totalQuestions, isLoading, submissionInProgress, navigateToQuestion, nextQuestion, previousQuestion]);
+    navigateToQuestion: stablePropsRef.current.navigateToQuestion,
+    nextQuestion: stablePropsRef.current.nextQuestion,
+    previousQuestion: stablePropsRef.current.previousQuestion
+  }), [currentQuestion, totalQuestions, isLoading, submissionInProgress]);
 
   const { handleQuestionNavigation, handleNext, handlePrevious } = useExamNavigationHandler(navigationHandlerProps);
 
   const { toggleFullscreen } = useExamFullscreen({ setIsFullscreen });
 
-  // Stable confirmation handler props
+  // Stable confirmation handler props - use ref values
   const confirmationHandlerProps = useMemo(() => ({
     currentQuestion,
-    clearAnswer,
-    toggleMarkForReview,
+    clearAnswer: stablePropsRef.current.clearAnswer,
+    toggleMarkForReview: stablePropsRef.current.toggleMarkForReview,
     handleSubmit
-  }), [currentQuestion, clearAnswer, toggleMarkForReview, handleSubmit]);
+  }), [currentQuestion, handleSubmit]);
 
   const confirmationHandlers = useExamConfirmationHandlers(confirmationHandlerProps);
 

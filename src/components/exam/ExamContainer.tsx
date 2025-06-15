@@ -1,5 +1,5 @@
 
-import { useMemo } from "react";
+import { useMemo, useRef, useEffect } from "react";
 import { useExamContainerState } from "@/hooks/useExamContainerState";
 import { useExamHandlers } from "@/hooks/useExamHandlers";
 import ExamLoadingState from "./ExamLoadingState";
@@ -32,18 +32,22 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     isMountedRef
   } = containerState;
 
-  // Stable handler props - prevent re-creation on every render
-  const handlerProps = useMemo(() => ({
+  // Create a stable props object to prevent re-creation
+  const stableHandlerProps = useRef({
     ...containerState,
     subject
-  }), [
-    // Only depend on actual changing values, not the entire containerState object
+  });
+
+  // Only update the ref when actual values change, not on every render
+  const propsHash = useMemo(() => {
+    return `${containerState.sessionId}-${containerState.questions.length}-${containerState.timeLeft}-${containerState.currentQuestion}-${Object.keys(containerState.answers).length}-${containerState.markedForReview.size}-${containerState.isFullscreen}-${containerState.isLoading}-${containerState.isSubmitting}-${containerState.totalQuestions}-${subject}`;
+  }, [
     containerState.sessionId,
-    containerState.questions,
+    containerState.questions.length,
     containerState.timeLeft,
     containerState.currentQuestion,
-    containerState.answers,
-    containerState.markedForReview,
+    Object.keys(containerState.answers).length,
+    containerState.markedForReview.size,
     containerState.isFullscreen,
     containerState.isLoading,
     containerState.isSubmitting,
@@ -51,7 +55,19 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     subject
   ]);
 
-  const handlers = useExamHandlers(handlerProps);
+  const lastPropsHashRef = useRef('');
+  
+  useEffect(() => {
+    if (lastPropsHashRef.current !== propsHash) {
+      stableHandlerProps.current = {
+        ...containerState,
+        subject
+      };
+      lastPropsHashRef.current = propsHash;
+    }
+  }, [propsHash, containerState, subject]);
+
+  const handlers = useExamHandlers(stableHandlerProps.current);
 
   // Loading state
   if (isLoading || questions.length === 0) {

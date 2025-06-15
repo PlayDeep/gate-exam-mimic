@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useSimpleExamSubmission } from "@/hooks/useSimpleExamSubmission";
 import { useExamTimerManager } from "@/hooks/useExamTimerManager";
 import { Question } from "@/services/questionService";
@@ -32,32 +32,55 @@ export const useExamSubmissionHandler = ({
   stopTimerForSubmission
 }: UseExamSubmissionHandlerProps) => {
   
-  // Memoize the question time data to prevent constant re-initialization
-  const { getTimeSpent, getAllTimeData, cleanupTimers } = useExamTimerManager({
+  // Stable refs to prevent unnecessary re-initialization
+  const stableSessionIdRef = useRef(sessionId);
+  const stableQuestionsRef = useRef(questions);
+  const stableSubjectRef = useRef(subject);
+  
+  // Update refs only when values actually change
+  useEffect(() => {
+    stableSessionIdRef.current = sessionId;
+  }, [sessionId]);
+  
+  useEffect(() => {
+    stableQuestionsRef.current = questions;
+  }, [questions]);
+  
+  useEffect(() => {
+    stableSubjectRef.current = subject;
+  }, [subject]);
+
+  // Memoize the timer manager with stable dependencies
+  const timerManagerProps = useMemo(() => ({
     currentQuestion,
     isLoading,
     questionsLength: questions.length,
-    sessionId,
+    sessionId: stableSessionIdRef.current,
     isSubmitting
-  });
+  }), [currentQuestion, isLoading, questions.length, isSubmitting]);
 
-  // Stable memoized submission props - only update when actual values change
-  const submissionProps = useMemo(() => ({
-    sessionId,
-    questions,
-    answers,
-    timeLeft,
-    subject,
-    questionTimeData: getAllTimeData()
-  }), [sessionId, questions, answers, timeLeft, subject, getAllTimeData]);
+  const { getTimeSpent, getAllTimeData, cleanupTimers } = useExamTimerManager(timerManagerProps);
+
+  // Ultra-stable submission props - use refs where possible
+  const submissionProps = useMemo(() => {
+    const questionTimeData = getAllTimeData();
+    return {
+      sessionId: stableSessionIdRef.current,
+      questions: stableQuestionsRef.current,
+      answers,
+      timeLeft,
+      subject: stableSubjectRef.current,
+      questionTimeData
+    };
+  }, [answers, timeLeft, getAllTimeData]);
 
   const { submitExam, isSubmitting: submissionInProgress } = useSimpleExamSubmission(submissionProps);
 
-  // Stable callback for submission - memoize with stable dependencies
+  // Extremely stable callback for submission
   const performSubmission = useCallback(async (source: string) => {
     console.log(`ExamSubmissionHandler: Starting submission from ${source}`);
     
-    if (!isMountedRef.current || submissionInProgress || !sessionId || questions.length === 0) {
+    if (!isMountedRef.current || submissionInProgress || !stableSessionIdRef.current || stableQuestionsRef.current.length === 0) {
       console.log('ExamSubmissionHandler: Submission conditions not met, aborting');
       return;
     }
@@ -74,9 +97,9 @@ export const useExamSubmissionHandler = ({
     } catch (error) {
       console.error(`ExamSubmissionHandler: ${source} submission failed:`, error);
     }
-  }, [submitExam, submissionInProgress, cleanupTimers, stopTimerForSubmission, isMountedRef, sessionId, questions.length]);
+  }, [submitExam, submissionInProgress, cleanupTimers, stopTimerForSubmission, isMountedRef]);
 
-  // Stable callbacks
+  // Stable callbacks with minimal dependencies
   const handleTimeUp = useCallback(async () => {
     console.log('ExamSubmissionHandler: Time up triggered');
     await performSubmission('time up');
@@ -87,13 +110,15 @@ export const useExamSubmissionHandler = ({
     await performSubmission('manual submit');
   }, [performSubmission]);
 
-  // Only sync submission states when actually different - prevent unnecessary updates
+  // Only sync submission states when actually different
+  const lastSyncedSubmissionState = useRef(isSubmitting);
   useEffect(() => {
-    if (isMountedRef.current && isSubmitting !== submissionInProgress) {
+    if (isMountedRef.current && lastSyncedSubmissionState.current !== submissionInProgress) {
       console.log('ExamSubmissionHandler: Syncing submission state:', submissionInProgress);
       setIsSubmitting(submissionInProgress);
+      lastSyncedSubmissionState.current = submissionInProgress;
     }
-  }, [submissionInProgress, setIsSubmitting, isMountedRef, isSubmitting]);
+  }, [submissionInProgress, setIsSubmitting, isMountedRef]);
 
   // Cleanup effect - only run on unmount
   useEffect(() => {
