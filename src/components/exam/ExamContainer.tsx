@@ -97,6 +97,11 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
   const { toggleFullscreen } = useExamFullscreen({ setIsFullscreen });
 
+  // Create a wrapper function for clearing the current question's answer
+  const handleClearResponse = () => {
+    clearAnswer(currentQuestion);
+  };
+
   // Loading state
   if (isLoading || questions.length === 0) {
     return <ExamLoadingState subject={subject} />;
@@ -131,7 +136,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
       markedForReview={markedForReview}
       onAnswerChange={handleAnswerChange}
       onMarkForReview={toggleMarkForReview}
-      onClearResponse={() => clearAnswer(currentQuestion)}
+      onClearResponse={handleClearResponse}
       onNext={handleNext}
       onPrevious={handlePrevious}
       answeredCount={answeredCount}
