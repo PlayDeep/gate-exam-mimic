@@ -32,14 +32,35 @@ const ScoreOverview = ({
   answers,
   questionTimeData = []
 }: ScoreOverviewProps) => {
-  const avgTimePerQuestion = Math.round(totalTimeSpent / totalQuestions);
   const answeredQuestions = Object.keys(answers).length;
   const unansweredQuestions = totalQuestions - answeredQuestions;
-  const timePerAnsweredQuestion = answeredQuestions > 0 ? Math.round(totalTimeSpent / answeredQuestions) : 0;
   
-  // Calculate time efficiency
+  // Convert totalTimeSpent from minutes to seconds for calculations
+  const totalTimeSpentInSeconds = totalTimeSpent * 60;
+  
+  // Calculate time metrics in seconds
+  const avgTimePerQuestion = totalQuestions > 0 ? Math.round(totalTimeSpentInSeconds / totalQuestions) : 0;
+  const timePerAnsweredQuestion = answeredQuestions > 0 ? Math.round(totalTimeSpentInSeconds / answeredQuestions) : 0;
+  
+  // Calculate time efficiency (3 hours = 10800 seconds)
   const totalAvailableTime = 180 * 60; // 3 hours in seconds
-  const timeUtilization = Math.round((totalTimeSpent / totalAvailableTime) * 100);
+  const timeUtilization = totalTimeSpentInSeconds > 0 ? Math.round((totalTimeSpentInSeconds / totalAvailableTime) * 100) : 0;
+  const timeRemainingSeconds = Math.max(0, totalAvailableTime - totalTimeSpentInSeconds);
+  
+  // Format time remaining
+  const formatTimeRemaining = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${mins}m ${secs}s`;
+    } else if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    } else {
+      return `${secs}s`;
+    }
+  };
   
   // Check if we have real time data
   const hasRealTimeData = questionTimeData && questionTimeData.length > 0 && questionTimeData.some(q => q.timeSpent > 0);
@@ -182,7 +203,7 @@ const ScoreOverview = ({
                 <div className="flex justify-between">
                   <span className="text-gray-600">Time Remaining:</span>
                   <span className="font-semibold text-green-600">
-                    {Math.floor((totalAvailableTime - totalTimeSpent) / 60)}m {(totalAvailableTime - totalTimeSpent) % 60}s
+                    {formatTimeRemaining(timeRemainingSeconds)}
                   </span>
                 </div>
                 
@@ -199,12 +220,12 @@ const ScoreOverview = ({
                 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Avg per Question:</span>
-                  <span className="font-semibold">{avgTimePerQuestion}s</span>
+                  <span className="font-semibold">{Math.floor(avgTimePerQuestion / 60)}m {avgTimePerQuestion % 60}s</span>
                 </div>
                 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Avg per Answered:</span>
-                  <span className="font-semibold">{timePerAnsweredQuestion}s</span>
+                  <span className="font-semibold">{Math.floor(timePerAnsweredQuestion / 60)}m {timePerAnsweredQuestion % 60}s</span>
                 </div>
                 
                 <div className="flex justify-between">
@@ -249,7 +270,7 @@ const ScoreOverview = ({
             {avgTimePerQuestion > 120 && (
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Suggestion:</strong> Average {avgTimePerQuestion}s per question. Aim for 2-3 minutes per question for optimal time usage.
+                  <strong>Suggestion:</strong> Average {Math.floor(avgTimePerQuestion / 60)}m {avgTimePerQuestion % 60}s per question. Aim for 2-3 minutes per question for optimal time usage.
                 </p>
               </div>
             )}
