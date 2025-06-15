@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from "react-router-dom";
-import { useToast } from "@/hooks/use-toast";
+
+import { useEffect } from 'react';
 import { useAuth } from "@/contexts/AuthContext";
-import { getRandomQuestionsForTest } from "@/services/questionService";
-import { createTestSession, submitTestSession, saveUserAnswer, checkIfTestSubmitted } from "@/services/testService";
 import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 import { useRealTimeTracking } from "@/hooks/useRealTimeTracking";
+import { useExamInitialization } from "@/hooks/useExamInitialization";
+import { useExamSubmission } from "@/hooks/useExamSubmission";
+import { useExamNavigation } from "@/hooks/useExamNavigation";
+import { useExamAnswers } from "@/hooks/useExamAnswers";
 
 interface UseExamLogicProps {
   subject: string | undefined;
@@ -48,92 +49,54 @@ export const useExamLogic = ({
   setIsLoading,
   totalQuestions
 }: UseExamLogicProps) => {
-  const navigate = useNavigate();
-  const { toast } = useToast();
   const { user, loading } = useAuth();
-  const { startTimer, stopTimer, getTimeSpent, getAllTimeData } = useQuestionTimer();
-  const { trackQuestionChange, trackAnswerUpdate } = useRealTimeTracking({ 
+  const { startTimer, stopTimer, getTimeSpent } = useQuestionTimer();
+  const { trackQuestionChange } = useRealTimeTracking({ 
     sessionId, 
     isActive: !isLoading && sessionId !== '' 
   });
-  
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check authentication
-  useEffect(() => {
-    if (!loading && !user) {
-      toast({
-        title: "Authentication Required",
-        description: "Please log in to take the test.",
-        variant: "destructive",
-      });
-      navigate('/');
-      return;
-    }
-  }, [user, loading, navigate, toast]);
+  // Initialize exam (authentication, questions loading, session creation)
+  useExamInitialization({
+    subject,
+    user,
+    loading,
+    sessionId,
+    setSessionId,
+    isLoading,
+    setIsLoading,
+    setQuestions
+  });
 
-  // Check if test is already submitted when session ID is available
-  useEffect(() => {
-    const checkSubmissionStatus = async () => {
-      if (sessionId) {
-        const isSubmitted = await checkIfTestSubmitted(sessionId);
-        if (isSubmitted) {
-          toast({
-            title: "Test Already Submitted",
-            description: "This test has already been submitted. You cannot make changes.",
-            variant: "destructive",
-          });
-          navigate('/previous-tests');
-        }
-      }
-    };
+  // Handle exam submission
+  const { handleSubmitExam, isSubmitting } = useExamSubmission({
+    sessionId,
+    user,
+    questions,
+    answers,
+    timeLeft,
+    totalQuestions,
+    subject
+  });
 
-    checkSubmissionStatus();
-  }, [sessionId, toast, navigate]);
+  // Handle navigation
+  const { handleNext, handlePrevious, navigateToQuestion } = useExamNavigation({
+    currentQuestion,
+    setCurrentQuestion,
+    totalQuestions,
+    isLoading
+  });
 
-  // Load questions and create test session
-  useEffect(() => {
-    const initializeTest = async () => {
-      if (!subject || !user) return;
-      
-      try {
-        setIsLoading(true);
-        
-        // Get random questions for this subject
-        const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
-        
-        if (fetchedQuestions.length === 0) {
-          toast({
-            title: "No Questions Available",
-            description: "No questions found for this subject. Please contact administrator.",
-            variant: "destructive",
-          });
-          navigate('/');
-          return;
-        }
-        
-        setQuestions(fetchedQuestions);
-        console.log('Loaded questions:', fetchedQuestions.map(q => ({ id: q.id, correct_answer: q.correct_answer, question_type: q.question_type })));
-        
-        // Create test session
-        const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
-        setSessionId(newSessionId);
-        
-      } catch (error) {
-        console.error('Error initializing test:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load test questions. Please try again.",
-          variant: "destructive",
-        });
-        navigate('/');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeTest();
-  }, [subject, user, navigate, toast, setIsLoading, setQuestions, setSessionId]);
+  // Handle answers and marking for review
+  const { handleAnswerChange, handleMarkForReview } = useExamAnswers({
+    sessionId,
+    questions,
+    answers,
+    setAnswers,
+    markedForReview,
+    setMarkedForReview,
+    isLoading
+  });
 
   // Start timer for first question when exam loads and handle question changes
   useEffect(() => {
@@ -159,7 +122,7 @@ export const useExamLogic = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isLoading, setTimeLeft]);
+  }, [isLoading, setTimeLeft, handleSubmitExam]);
 
   // Fullscreen effect
   useEffect(() => {
@@ -191,252 +154,6 @@ export const useExamLogic = ({
     };
   }, [stopTimer]);
 
-  const handleAnswerChange = async (questionId: number, answer: string) => {
-    console.log('=== ANSWER CHANGE START ===');
-    console.log('Question ID:', questionId);
-    console.log('User Answer:', answer);
-    console.log('Answer Type:', typeof answer);
-    
-    setAnswers(prev => ({ ...prev, [questionId]: answer }));
-    
-    // Track answer update in real-time
-    trackAnswerUpdate(questionId, answer);
-    
-    // Save answer to database with actual time spent
-    if (sessionId && questions[questionId - 1]) {
-      const question = questions[questionId - 1];
-      console.log('Question Data:', {
-        id: question.id,
-        correct_answer: question.correct_answer,
-        correct_answer_type: typeof question.correct_answer,
-        question_type: question.question_type,
-        marks: question.marks,
-        negative_marks: question.negative_marks
-      });
-      
-      // Normalize both answers for comparison - convert to strings and trim
-      const normalizedUserAnswer = String(answer).trim();
-      const normalizedCorrectAnswer = String(question.correct_answer).trim();
-      
-      console.log('Normalized User Answer:', normalizedUserAnswer);
-      console.log('Normalized Correct Answer:', normalizedCorrectAnswer);
-      
-      const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
-      console.log('Is Correct:', isCorrect);
-      
-      let marksAwarded = 0;
-      if (isCorrect) {
-        marksAwarded = question.marks;
-      } else if (question.question_type === 'MCQ') {
-        // Apply negative marking for MCQ
-        marksAwarded = -(question.negative_marks || 0);
-      }
-      // NAT questions don't have negative marking
-      
-      console.log('Marks Awarded:', marksAwarded);
-      
-      // Get actual time spent on this question
-      const timeSpent = getTimeSpent(questionId);
-      console.log('Time Spent on Question:', timeSpent, 'seconds');
-      console.log('=== ANSWER CHANGE END ===');
-      
-      try {
-        await saveUserAnswer(
-          sessionId,
-          question.id,
-          answer,
-          isCorrect,
-          marksAwarded,
-          timeSpent
-        );
-      } catch (error) {
-        console.error('Error saving answer:', error);
-      }
-    }
-  };
-
-  const handleMarkForReview = (questionId: number) => {
-    setMarkedForReview(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(questionId)) {
-        newSet.delete(questionId);
-      } else {
-        newSet.add(questionId);
-      }
-      return newSet;
-    });
-  };
-
-  const handleSubmitExam = async () => {
-    console.log('=== SUBMIT EXAM START ===');
-    console.log('Session ID:', sessionId);
-    console.log('Is Submitting:', isSubmitting);
-    console.log('User:', user?.id);
-    console.log('Questions length:', questions.length);
-    console.log('Answers count:', Object.keys(answers).length);
-    
-    if (!sessionId) {
-      console.error('No session ID found');
-      toast({
-        title: "Error",
-        description: "No active session found. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!user) {
-      console.error('No user found');
-      toast({
-        title: "Error",
-        description: "Authentication required. Please log in again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (isSubmitting) {
-      console.log('Already submitting, preventing duplicate submission');
-      return;
-    }
-    
-    setIsSubmitting(true);
-    
-    // Stop current timer
-    stopTimer();
-    
-    try {
-      const timeSpentMinutes = Math.floor((180 * 60 - timeLeft) / 60);
-      const answeredCount = Object.keys(answers).length;
-      
-      // Calculate score with detailed logging
-      let totalScore = 0;
-      let correctAnswers = 0;
-      let wrongAnswers = 0;
-      let unansweredCount = 0;
-      
-      console.log('=== FINAL SCORE CALCULATION START ===');
-      console.log('Total answers provided:', Object.keys(answers).length);
-      console.log('Total questions:', questions.length);
-      console.log('Answers object:', answers);
-      
-      // Process each question
-      questions.forEach((question, index) => {
-        const questionNum = index + 1;
-        const userAnswer = answers[questionNum];
-        
-        console.log(`\n--- Question ${questionNum} ---`);
-        console.log('Question ID:', question.id);
-        console.log('Question Type:', question.question_type);
-        console.log('User Answer:', userAnswer);
-        console.log('Correct Answer:', question.correct_answer);
-        console.log('Marks:', question.marks);
-        console.log('Negative Marks:', question.negative_marks);
-        
-        if (!userAnswer || userAnswer === '') {
-          unansweredCount++;
-          console.log('Status: UNANSWERED');
-          return;
-        }
-        
-        // Normalize both answers for comparison
-        const normalizedUserAnswer = String(userAnswer).trim();
-        const normalizedCorrectAnswer = String(question.correct_answer).trim();
-        
-        console.log('Normalized User Answer:', normalizedUserAnswer);
-        console.log('Normalized Correct Answer:', normalizedCorrectAnswer);
-        
-        const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
-        console.log('Is Correct:', isCorrect);
-        
-        if (isCorrect) {
-          correctAnswers++;
-          totalScore += question.marks;
-          console.log(`Status: CORRECT - Added ${question.marks} marks. Running total: ${totalScore}`);
-        } else {
-          wrongAnswers++;
-          if (question.question_type === 'MCQ') {
-            const penalty = question.negative_marks || 0;
-            totalScore -= penalty;
-            console.log(`Status: WRONG (MCQ) - Deducted ${penalty} marks. Running total: ${totalScore}`);
-          } else {
-            console.log(`Status: WRONG (NAT) - No penalty. Running total: ${totalScore}`);
-          }
-        }
-      });
-      
-      const percentage = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
-      
-      console.log('\n=== FINAL RESULTS ===');
-      console.log('Total Score:', totalScore);
-      console.log('Correct Answers:', correctAnswers);
-      console.log('Wrong Answers:', wrongAnswers);
-      console.log('Unanswered:', unansweredCount);
-      console.log('Total Questions:', totalQuestions);
-      console.log('Percentage:', percentage);
-      console.log('Answered Count:', answeredCount);
-      console.log('=== FINAL SCORE CALCULATION END ===');
-      
-      // Submit test session with timestamp
-      console.log('Submitting test session...');
-      console.log('Submission data:', {
-        end_time: new Date().toISOString(),
-        answered_questions: answeredCount,
-        score: totalScore,
-        percentage: percentage,
-        time_taken: timeSpentMinutes
-      });
-      
-      await submitTestSession(sessionId, {
-        end_time: new Date().toISOString(),
-        answered_questions: answeredCount,
-        score: totalScore,
-        percentage: percentage,
-        time_taken: timeSpentMinutes
-      });
-      
-      console.log('Test session submitted successfully');
-      
-      // Get all time data for results
-      const questionTimeData = getAllTimeData();
-      console.log('All time data being passed to results:', questionTimeData);
-      
-      toast({
-        title: "Test Submitted",
-        description: "Your test has been submitted successfully!",
-      });
-      
-      console.log('Navigating to results...');
-      navigate('/results', { 
-        state: { 
-          sessionId,
-          answers, 
-          questions, 
-          timeSpent: timeSpentMinutes,
-          subject,
-          score: totalScore,
-          percentage: percentage,
-          questionTimeData: questionTimeData
-        } 
-      });
-      
-      console.log('=== SUBMIT EXAM SUCCESS ===');
-    } catch (error) {
-      console.error('Error submitting exam:', error);
-      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      
-      toast({
-        title: "Error",
-        description: `Failed to submit exam: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-      console.log('=== SUBMIT EXAM END ===');
-    }
-  };
-
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen();
@@ -447,35 +164,6 @@ export const useExamLogic = ({
 
   const openCalculator = () => {
     window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
-  };
-
-  const handleNext = () => {
-    console.log('Next clicked. Current question:', currentQuestion, 'Total questions:', totalQuestions);
-    if (!isLoading && totalQuestions > 0 && currentQuestion < totalQuestions) {
-      const nextQuestion = currentQuestion + 1;
-      console.log('Moving to question:', nextQuestion);
-      
-      setCurrentQuestion(nextQuestion);
-    } else {
-      console.log('Cannot move to next question. Loading:', isLoading, 'Total:', totalQuestions, 'Current:', currentQuestion);
-    }
-  };
-
-  const handlePrevious = () => {
-    console.log('Previous clicked. Current question:', currentQuestion);
-    if (!isLoading && currentQuestion > 1) {
-      const prevQuestion = currentQuestion - 1;
-      console.log('Moving to question:', prevQuestion);
-      
-      setCurrentQuestion(prevQuestion);
-    } else {
-      console.log('Cannot move to previous question. Loading:', isLoading, 'Current:', currentQuestion);
-    }
-  };
-
-  const navigateToQuestion = (questionNum: number) => {
-    console.log('Question grid clicked:', questionNum);
-    setCurrentQuestion(questionNum);
   };
 
   return {
