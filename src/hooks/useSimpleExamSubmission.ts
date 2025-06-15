@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Question } from '@/services/questionService';
@@ -62,7 +63,6 @@ export const useSimpleExamSubmission = ({
     console.log('Subject:', subject);
     
     setIsSubmitting(true);
-    let hasError = false;
 
     try {
       const totalQuestions = questions.length;
@@ -154,14 +154,12 @@ export const useSimpleExamSubmission = ({
         timeDataCount: resultsData.questionTimeData.length
       });
 
-      // Enhanced storage with error handling
+      // Store results in sessionStorage with error handling
       try {
         const dataToStore = JSON.stringify(resultsData);
         if (typeof Storage !== 'undefined' && window.sessionStorage) {
           sessionStorage.setItem('examResults', dataToStore);
           console.log('Results data stored in sessionStorage successfully');
-        } else {
-          console.warn('SessionStorage not available');
         }
       } catch (storageError) {
         console.error('Failed to store results in sessionStorage:', storageError);
@@ -175,54 +173,35 @@ export const useSimpleExamSubmission = ({
 
       console.log('=== NAVIGATING TO RESULTS ===');
       
-      // Enhanced navigation with multiple fallback strategies
-      let navigationSuccessful = false;
-      
+      // Simplified navigation with fallback
       try {
         navigate('/results', {
           state: resultsData,
           replace: true
         });
-        navigationSuccessful = true;
-        console.log('Navigation initiated to results page');
+        console.log('Navigation to results initiated');
       } catch (navError) {
-        console.error('Primary navigation failed:', navError);
+        console.error('Navigation failed:', navError);
         
-        // Fallback 1: Try navigation without state
+        // Fallback: try window.location
         try {
-          navigate('/results', { replace: true });
-          navigationSuccessful = true;
-          console.log('Fallback navigation without state successful');
-        } catch (fallbackError) {
-          console.error('Fallback navigation failed:', fallbackError);
+          window.location.href = '/results';
+          console.log('Fallback navigation attempted');
+        } catch (locationError) {
+          console.error('All navigation methods failed:', locationError);
           
-          // Fallback 2: Try window.location as last resort
-          try {
-            window.location.href = '/results';
-            navigationSuccessful = true;
-            console.log('Window location navigation attempted');
-          } catch (locationError) {
-            console.error('All navigation methods failed:', locationError);
-            
-            // Final fallback: Show success message and let user navigate manually
-            toast({
-              title: "Exam Submitted - Navigation Error",
-              description: "Your exam was submitted successfully. Please refresh the page or navigate to results manually.",
-              variant: "destructive",
-            });
-          }
+          toast({
+            title: "Exam Submitted - Navigation Error",
+            description: "Your exam was submitted successfully. Please refresh the page or navigate to results manually.",
+            variant: "destructive",
+          });
         }
-      }
-      
-      if (!navigationSuccessful) {
-        console.error('All navigation attempts failed');
       }
       
     } catch (error) {
       console.error('=== SUBMISSION ERROR ===');
       console.error('Error details:', error);
       
-      hasError = true;
       const errorMessage = error instanceof Error ? error.message : "Failed to submit the test. Please try again.";
       
       toast({
@@ -230,14 +209,12 @@ export const useSimpleExamSubmission = ({
         description: errorMessage,
         variant: "destructive",
       });
-    } finally {
-      // Only reset submitting state if there was an error (to allow retry)
-      // For successful submissions, keep isSubmitting true to prevent duplicate submissions
-      if (hasError) {
-        setIsSubmitting(false);
-      }
-      console.log('=== SUBMISSION PROCESS COMPLETED ===');
+      
+      // Reset submitting state on error to allow retry
+      setIsSubmitting(false);
     }
+    
+    console.log('=== SUBMISSION PROCESS COMPLETED ===');
   };
 
   return { 

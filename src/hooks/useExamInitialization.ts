@@ -14,15 +14,28 @@ export const useExamInitialization = () => {
   const { toast } = useToast();
   const initializationAttemptedRef = useRef(false);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sessionId, setSessionId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Authentication check - separate effect
+  // Component mount tracking
   useEffect(() => {
-    if (!loading) {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+        navigationTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // Authentication and subject validation
+  useEffect(() => {
+    if (!loading && isMountedRef.current) {
       if (!user) {
         console.log('useExamInitialization: User not authenticated, redirecting to home');
         toast({
@@ -30,7 +43,7 @@ export const useExamInitialization = () => {
           description: "Please log in to take the test.",
           variant: "destructive",
         });
-        navigate('/');
+        navigate('/', { replace: true });
         return;
       }
       
@@ -41,7 +54,7 @@ export const useExamInitialization = () => {
           description: "No subject specified for the test.",
           variant: "destructive",
         });
-        navigate('/');
+        navigate('/', { replace: true });
         return;
       }
     }
@@ -51,7 +64,7 @@ export const useExamInitialization = () => {
   useEffect(() => {
     const initializeExam = async () => {
       // Check if we should initialize
-      if (loading || !user || !subject || initializationAttemptedRef.current) {
+      if (loading || !user || !subject || initializationAttemptedRef.current || !isMountedRef.current) {
         return;
       }
       
@@ -64,6 +77,8 @@ export const useExamInitialization = () => {
         setError(null);
         
         const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
+        
+        if (!isMountedRef.current) return; // Check if still mounted
         
         if (!Array.isArray(fetchedQuestions) || fetchedQuestions.length === 0) {
           throw new Error(`No questions found for subject: ${subject}`);
@@ -80,9 +95,13 @@ export const useExamInitialization = () => {
         }
         
         console.log('useExamInitialization: Questions loaded successfully:', fetchedQuestions.length);
+        
+        if (!isMountedRef.current) return; // Check if still mounted
         setQuestions(fetchedQuestions);
         
         const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
+        
+        if (!isMountedRef.current) return; // Check if still mounted
         
         if (!newSessionId || typeof newSessionId !== 'string') {
           throw new Error('Failed to create valid test session');
@@ -94,6 +113,8 @@ export const useExamInitialization = () => {
         console.log('useExamInitialization: Exam initialization complete');
         
       } catch (error) {
+        if (!isMountedRef.current) return; // Check if still mounted
+        
         console.error('useExamInitialization: Error during initialization:', error);
         
         const errorMessage = error instanceof Error ? error.message : 'Failed to initialize exam';
@@ -111,28 +132,24 @@ export const useExamInitialization = () => {
         // Clear any existing timeout
         if (navigationTimeoutRef.current) {
           clearTimeout(navigationTimeoutRef.current);
+          navigationTimeoutRef.current = null;
         }
         
         // Delay navigation to allow user to see the error
         navigationTimeoutRef.current = setTimeout(() => {
-          navigate('/');
+          if (isMountedRef.current) {
+            navigate('/', { replace: true });
+          }
         }, 3000);
       } finally {
-        setIsLoading(false);
+        if (isMountedRef.current) {
+          setIsLoading(false);
+        }
       }
     };
 
     initializeExam();
   }, [subject, user, loading, navigate, toast]);
-
-  // Cleanup effect
-  useEffect(() => {
-    return () => {
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-      }
-    };
-  }, []);
 
   return {
     questions,

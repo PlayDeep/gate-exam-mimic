@@ -17,50 +17,78 @@ export const useExamTimer = ({
 }: UseExamTimerProps) => {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const onTimeUpRef = useRef(onTimeUp);
+  const hasCalledTimeUpRef = useRef(false);
+  const isMountedRef = useRef(true);
 
-  // Keep onTimeUp reference current to avoid stale closures
+  // Keep onTimeUp reference current
   useEffect(() => {
     onTimeUpRef.current = onTimeUp;
   }, [onTimeUp]);
 
+  // Track component mount status
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const handleTimeUp = useCallback(() => {
-    console.log('Timer: Time is up, calling onTimeUp callback');
-    onTimeUpRef.current();
+    if (!hasCalledTimeUpRef.current && isMountedRef.current) {
+      console.log('Timer: Time is up, calling onTimeUp callback');
+      hasCalledTimeUpRef.current = true;
+      onTimeUpRef.current();
+    }
+  }, []);
+
+  const cleanupTimer = useCallback(() => {
+    if (timerRef.current) {
+      console.log('Timer: Cleaning up timer');
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
   }, []);
 
   useEffect(() => {
-    // Don't start timer if loading or no session
-    if (isLoading || !sessionId) {
-      console.log('Timer: Not starting - isLoading:', isLoading, 'sessionId:', !!sessionId);
+    // Clean up any existing timer first
+    cleanupTimer();
+    
+    // Reset time up flag when starting new timer
+    hasCalledTimeUpRef.current = false;
+    
+    // Don't start timer if loading, no session, or already called time up
+    if (isLoading || !sessionId || timeLeft <= 0) {
+      console.log('Timer: Not starting - isLoading:', isLoading, 'sessionId:', !!sessionId, 'timeLeft:', timeLeft);
       return;
     }
     
     console.log('Timer: Starting countdown timer with', timeLeft, 'seconds');
     
     timerRef.current = setInterval(() => {
+      if (!isMountedRef.current) {
+        cleanupTimer();
+        return;
+      }
+      
       setTimeLeft((prev) => {
-        if (prev <= 1) {
+        const newTime = Math.max(0, prev - 1);
+        if (newTime <= 0 && !hasCalledTimeUpRef.current) {
           console.log('Timer: Time reached 0, triggering time up');
-          handleTimeUp();
-          return 0;
+          // Use setTimeout to avoid calling during render
+          setTimeout(() => handleTimeUp(), 0);
         }
-        return prev - 1;
+        return newTime;
       });
     }, 1000);
 
-    return () => {
-      if (timerRef.current) {
-        console.log('Timer: Cleaning up timer');
-        clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [isLoading, sessionId, setTimeLeft, handleTimeUp]);
+    return cleanupTimer;
+  }, [isLoading, sessionId, timeLeft, setTimeLeft, handleTimeUp, cleanupTimer]);
 
   const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    const validSeconds = Math.max(0, Math.floor(seconds));
+    const hours = Math.floor(validSeconds / 3600);
+    const minutes = Math.floor((validSeconds % 3600) / 60);
+    const secs = validSeconds % 60;
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 

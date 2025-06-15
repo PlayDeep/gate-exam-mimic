@@ -28,6 +28,7 @@ export const useResultsData = () => {
     console.log('useResultsData: Loading results data');
     
     let redirectTimeout: NodeJS.Timeout | null = null;
+    let isMounted = true;
     
     const loadResultsData = () => {
       try {
@@ -89,19 +90,18 @@ export const useResultsData = () => {
         if (data.questionTimeData && Array.isArray(data.questionTimeData)) {
           questionTimeData = data.questionTimeData
             .filter(item => {
-              // More robust validation
+              // More lenient validation - allow any reasonable numeric values
               if (!item || typeof item !== 'object') return false;
               if (typeof item.questionNumber !== 'number' || typeof item.timeSpent !== 'number') return false;
-              if (item.questionNumber <= 0 || item.timeSpent < 0) return false;
               if (!isFinite(item.questionNumber) || !isFinite(item.timeSpent)) return false;
               if (isNaN(item.questionNumber) || isNaN(item.timeSpent)) return false;
               return true;
             })
             .map(item => ({
-              questionNumber: Math.floor(Math.abs(item.questionNumber)), // Ensure positive integer
+              questionNumber: Math.max(1, Math.floor(Math.abs(item.questionNumber))), // Ensure positive integer >= 1
               timeSpent: Math.max(0, Math.floor(item.timeSpent)) // Ensure non-negative integer
             }))
-            .filter(item => item.questionNumber > 0); // Final filter for valid question numbers
+            .filter(item => item.questionNumber > 0 && item.questionNumber <= data.questions.length); // Valid question range
           
           console.log('useResultsData: Validated question time data:', questionTimeData.length, 'entries');
         }
@@ -132,26 +132,35 @@ export const useResultsData = () => {
           subject: finalResultsData.subject
         });
         
-        setResultsData(finalResultsData);
-        setError(null);
+        if (isMounted) {
+          setResultsData(finalResultsData);
+          setError(null);
+        }
       } catch (error) {
+        if (!isMounted) return;
+        
         console.error('useResultsData: Error loading results data:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to load exam results';
         setError(errorMessage);
         
         // Redirect to home after showing error with proper cleanup
         redirectTimeout = setTimeout(() => {
-          navigate('/', { replace: true });
+          if (isMounted) {
+            navigate('/', { replace: true });
+          }
         }, 3000);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadResultsData();
 
-    // Cleanup function to clear timeout if component unmounts
+    // Cleanup function to clear timeout and mark as unmounted
     return () => {
+      isMounted = false;
       if (redirectTimeout) {
         clearTimeout(redirectTimeout);
       }
