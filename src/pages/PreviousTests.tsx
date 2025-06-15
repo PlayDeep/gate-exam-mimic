@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { BookOpen, Calendar, Clock, Award, Eye, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUserTestSessions, TestSession, getTestSessionDetails } from "@/services/testService";
+import { getUserTestSessions, TestSession, getTestSessionDetails, deleteTestSession } from "@/services/testService";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -146,27 +145,8 @@ const PreviousTests = () => {
     try {
       console.log('Deleting test session:', testId);
       
-      // First delete related user_answers
-      const { error: answersError } = await supabase
-        .from('user_answers')
-        .delete()
-        .eq('session_id', testId);
-
-      if (answersError) {
-        console.error('Error deleting user answers:', answersError);
-        throw answersError;
-      }
-
-      // Then delete the test session
-      const { error: sessionError } = await supabase
-        .from('test_sessions')
-        .delete()
-        .eq('id', testId);
-
-      if (sessionError) {
-        console.error('Error deleting test session:', sessionError);
-        throw sessionError;
-      }
+      // Use the service function to properly delete the test session
+      await deleteTestSession(testId);
 
       // Update local state only after successful deletion
       setTests(prev => prev.filter(test => test.id !== testId));
