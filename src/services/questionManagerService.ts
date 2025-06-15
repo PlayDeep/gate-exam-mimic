@@ -160,6 +160,27 @@ export const submitQuestion = async (formData: FormData, editingQuestion: Questi
 };
 
 export const deleteQuestion = async (id: string): Promise<void> => {
+  console.log('questionManagerService: Deleting question with id:', id);
+  
+  // First, delete all user answers for this specific question to avoid foreign key constraint violation
+  console.log('questionManagerService: Deleting user answers for question:', id);
+  const { error: answersError } = await supabase
+    .from('user_answers')
+    .delete()
+    .eq('question_id', id);
+
+  if (answersError) {
+    console.error('questionManagerService: Error deleting user answers for question:', answersError);
+    toast({
+      title: "Error",
+      description: `Failed to delete related user answers: ${answersError.message}`,
+      variant: "destructive"
+    });
+    throw answersError;
+  }
+
+  // Then delete the question
+  console.log('questionManagerService: Deleting question:', id);
   const { error } = await supabase
     .from('questions')
     .delete()
@@ -177,6 +198,6 @@ export const deleteQuestion = async (id: string): Promise<void> => {
 
   toast({
     title: "Success",
-    description: "Question deleted successfully!"
+    description: "Question and related data deleted successfully!"
   });
 };
