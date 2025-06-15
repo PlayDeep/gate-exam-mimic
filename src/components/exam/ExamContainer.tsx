@@ -131,7 +131,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
       markedForReview={markedForReview}
       onAnswerChange={handleAnswerChange}
       onMarkForReview={toggleMarkForReview}
-      onClearResponse={clearAnswer}
+      onClearResponse={() => clearAnswer(currentQuestion)}
       onNext={handleNext}
       onPrevious={handlePrevious}
       answeredCount={answeredCount}
