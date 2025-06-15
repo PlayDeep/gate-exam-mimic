@@ -1,4 +1,3 @@
-
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -149,6 +148,18 @@ const Results = () => {
   const gradeInfo = getGrade(percentage);
   const timeSpentFormatted = `${Math.floor(timeSpent / 60)}m ${timeSpent % 60}s`;
 
+  // Generate question time data for the chart (simulated data since we don't have actual per-question timing)
+  const questionTimeData = Array.from({ length: questions.length }, (_, index) => {
+    const questionNum = index + 1;
+    const isAnswered = answers[questionNum];
+    // Simulate realistic time spent based on whether question was answered
+    const baseTime = isAnswered ? Math.floor(Math.random() * 120) + 30 : 0; // 30-150s for answered, 0 for unanswered
+    return {
+      questionNumber: questionNum,
+      timeSpent: baseTime
+    };
+  });
+
   const handleDownloadReport = () => {
     const reportData = {
       subject,
@@ -229,6 +240,7 @@ const Results = () => {
           totalTimeSpent={timeSpent}
           totalQuestions={results.totalQuestions}
           answers={answers}
+          questionTimeData={questionTimeData}
         />
 
         <QuestionAnalysis

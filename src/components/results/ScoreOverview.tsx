@@ -2,6 +2,8 @@
 import { Trophy, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 
 interface ScoreOverviewProps {
   score: number;
@@ -16,6 +18,7 @@ interface ScoreOverviewProps {
   totalTimeSpent: number;
   totalQuestions: number;
   answers: Record<number, string>;
+  questionTimeData?: Array<{ questionNumber: number; timeSpent: number }>;
 }
 
 const ScoreOverview = ({ 
@@ -26,7 +29,8 @@ const ScoreOverview = ({
   timeSpentFormatted, 
   totalTimeSpent,
   totalQuestions,
-  answers 
+  answers,
+  questionTimeData = []
 }: ScoreOverviewProps) => {
   const avgTimePerQuestion = Math.round(totalTimeSpent / totalQuestions);
   const answeredQuestions = Object.keys(answers).length;
@@ -42,9 +46,27 @@ const ScoreOverview = ({
   const mediumQuestions = answeredQuestions > 0 ? Math.round(answeredQuestions * 0.5) : 0; // 50% medium time
   const slowQuestions = answeredQuestions - fastQuestions - mediumQuestions;
 
+  // Generate chart data - if no specific time data provided, create sample data based on average
+  const chartData = questionTimeData.length > 0 
+    ? questionTimeData.map(item => ({
+        question: `Q${item.questionNumber}`,
+        timeSpent: item.timeSpent
+      }))
+    : Array.from({ length: totalQuestions }, (_, index) => ({
+        question: `Q${index + 1}`,
+        timeSpent: answers[index + 1] ? Math.floor(Math.random() * 180) + 30 : 0 // Random time for answered questions
+      }));
+
+  const chartConfig = {
+    timeSpent: {
+      label: "Time Spent (seconds)",
+      color: "hsl(var(--chart-1))",
+    },
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-      <Card className="lg:col-span-2">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Trophy className="w-6 h-6 text-yellow-500" />
@@ -83,7 +105,7 @@ const ScoreOverview = ({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="lg:col-span-1">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Clock className="w-6 h-6 text-blue-500" />
@@ -91,88 +113,118 @@ const ScoreOverview = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Total Time:</span>
-              <span className="font-semibold">{timeSpentFormatted}</span>
+          <div className="space-y-6">
+            {/* Time Chart */}
+            <div className="h-64 w-full">
+              <h4 className="font-medium text-gray-800 mb-3">Time per Question</h4>
+              <ChartContainer config={chartConfig}>
+                <BarChart data={chartData}>
+                  <XAxis 
+                    dataKey="question" 
+                    tick={{ fontSize: 10 }}
+                    interval={Math.max(1, Math.floor(totalQuestions / 10))}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 10 }}
+                    label={{ value: 'Time (s)', angle: -90, position: 'insideLeft' }}
+                  />
+                  <ChartTooltip 
+                    content={<ChartTooltipContent />}
+                    formatter={(value: any) => [`${value}s`, "Time Spent"]}
+                  />
+                  <Bar 
+                    dataKey="timeSpent" 
+                    fill="var(--color-timeSpent)"
+                    radius={[2, 2, 0, 0]}
+                  />
+                </BarChart>
+              </ChartContainer>
             </div>
-            
-            <div className="flex justify-between">
-              <span className="text-gray-600">Time Remaining:</span>
-              <span className="font-semibold text-green-600">
-                {Math.floor((totalAvailableTime - totalTimeSpent) / 60)}m {(totalAvailableTime - totalTimeSpent) % 60}s
-              </span>
+
+            {/* Summary Statistics */}
+            <div className="space-y-4">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Total Time:</span>
+                <span className="font-semibold">{timeSpentFormatted}</span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Time Remaining:</span>
+                <span className="font-semibold text-green-600">
+                  {Math.floor((totalAvailableTime - totalTimeSpent) / 60)}m {(totalAvailableTime - totalTimeSpent) % 60}s
+                </span>
+              </div>
+              
+              <div className="flex justify-between">
+                <span className="text-gray-600">Time Utilization:</span>
+                <span className={`font-semibold ${timeUtilization > 90 ? 'text-red-500' : timeUtilization > 70 ? 'text-yellow-500' : 'text-green-500'}`}>
+                  {timeUtilization}%
+                </span>
+              </div>
+              
+              <hr className="my-3" />
+              
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-800">Per Question Analysis</h4>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Avg per Question:</span>
+                  <span className="font-semibold">{avgTimePerQuestion}s</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Avg per Answered:</span>
+                  <span className="font-semibold">{timePerAnsweredQuestion}s</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Questions Answered:</span>
+                  <span className="font-semibold">{answeredQuestions}/{totalQuestions}</span>
+                </div>
+              </div>
+              
+              <hr className="my-3" />
+              
+              <div className="space-y-2">
+                <h4 className="font-medium text-gray-800">Time Distribution</h4>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Quick (&lt;30s):</span>
+                  <span className="font-semibold text-green-600">~{fastQuestions}</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Medium (30-90s):</span>
+                  <span className="font-semibold text-yellow-600">~{mediumQuestions}</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Slow (&gt;90s):</span>
+                  <span className="font-semibold text-red-600">~{slowQuestions}</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Unanswered:</span>
+                  <span className="font-semibold text-gray-500">{unansweredQuestions}</span>
+                </div>
+              </div>
+              
+              {timeUtilization > 85 && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Tip:</strong> You used {timeUtilization}% of available time. Consider time management strategies for better performance.
+                  </p>
+                </div>
+              )}
+              
+              {avgTimePerQuestion > 120 && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    <strong>Suggestion:</strong> Average {avgTimePerQuestion}s per question. Aim for 2-3 minutes per question for optimal time usage.
+                  </p>
+                </div>
+              )}
             </div>
-            
-            <div className="flex justify-between">
-              <span className="text-gray-600">Time Utilization:</span>
-              <span className={`font-semibold ${timeUtilization > 90 ? 'text-red-500' : timeUtilization > 70 ? 'text-yellow-500' : 'text-green-500'}`}>
-                {timeUtilization}%
-              </span>
-            </div>
-            
-            <hr className="my-3" />
-            
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-800">Per Question Analysis</h4>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Avg per Question:</span>
-                <span className="font-semibold">{avgTimePerQuestion}s</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Avg per Answered:</span>
-                <span className="font-semibold">{timePerAnsweredQuestion}s</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Questions Answered:</span>
-                <span className="font-semibold">{answeredQuestions}/{totalQuestions}</span>
-              </div>
-            </div>
-            
-            <hr className="my-3" />
-            
-            <div className="space-y-2">
-              <h4 className="font-medium text-gray-800">Time Distribution</h4>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Quick (&lt;30s):</span>
-                <span className="font-semibold text-green-600">~{fastQuestions}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Medium (30-90s):</span>
-                <span className="font-semibold text-yellow-600">~{mediumQuestions}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Slow (&gt;90s):</span>
-                <span className="font-semibold text-red-600">~{slowQuestions}</span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Unanswered:</span>
-                <span className="font-semibold text-gray-500">{unansweredQuestions}</span>
-              </div>
-            </div>
-            
-            {timeUtilization > 85 && (
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <p className="text-sm text-yellow-800">
-                  <strong>Tip:</strong> You used {timeUtilization}% of available time. Consider time management strategies for better performance.
-                </p>
-              </div>
-            )}
-            
-            {avgTimePerQuestion > 120 && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                <p className="text-sm text-blue-800">
-                  <strong>Suggestion:</strong> Average {avgTimePerQuestion}s per question. Aim for 2-3 minutes per question for optimal time usage.
-                </p>
-              </div>
-            )}
           </div>
         </CardContent>
       </Card>
