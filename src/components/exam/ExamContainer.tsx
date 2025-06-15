@@ -1,16 +1,9 @@
 
-import { useExamTimer } from "@/hooks/useExamTimer";
-import { useExamAnswerHandler } from "@/hooks/useExamAnswerHandler";
-import { useExamNavigationHandler } from "@/hooks/useExamNavigationHandler";
-import { useExamFullscreen } from "@/hooks/useExamFullscreen";
 import { useExamContainerState } from "@/hooks/useExamContainerState";
-import { useExamSubmissionHandler } from "@/hooks/useExamSubmissionHandler";
-import { useKeyboardNavigation } from "@/hooks/useKeyboardNavigation";
-import { useTimeWarnings } from "@/hooks/useTimeWarnings";
-import { useConfirmationDialogs } from "@/hooks/useConfirmationDialogs";
+import { useExamHandlers } from "@/hooks/useExamHandlers";
 import ExamLoadingState from "./ExamLoadingState";
 import ExamContainerLayout from "./ExamContainerLayout";
-import ConfirmationDialog from "./ConfirmationDialog";
+import ExamConfirmationDialogs from "./ExamConfirmationDialogs";
 import { Question } from "@/services/questionService";
 
 interface ExamContainerProps {
@@ -20,143 +13,28 @@ interface ExamContainerProps {
 }
 
 const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionId, subject }: ExamContainerProps) => {
-  const {
-    timeLeft,
-    setTimeLeft,
-    currentQuestion,
-    answers,
-    markedForReview,
-    isFullscreen,
-    setIsFullscreen,
-    questions,
-    sessionId,
-    isLoading,
-    isSubmitting,
-    setIsSubmitting,
-    totalQuestions,
-    clearAnswer,
-    navigateToQuestion,
-    nextQuestion,
-    previousQuestion,
-    toggleMarkForReview,
-    updateAnswer,
-    isMountedRef
-  } = useExamContainerState({
+  const containerState = useExamContainerState({
     initialQuestions,
     initialSessionId
   });
 
   const {
-    handleTimeUp,
-    handleSubmit,
-    getTimeSpent,
-    submissionInProgress
-  } = useExamSubmissionHandler({
-    sessionId,
-    questions,
+    timeLeft,
+    currentQuestion,
     answers,
-    timeLeft,
-    subject,
-    currentQuestion,
-    isLoading,
-    isSubmitting,
-    setIsSubmitting,
-    isMountedRef,
-    stopTimerForSubmission: () => {} // Will be set by timer
-  });
-
-  const { formattedTime, stopTimerForSubmission } = useExamTimer({
-    timeLeft,
-    setTimeLeft,
-    isLoading: isLoading || questions.length === 0,
-    sessionId,
-    onTimeUp: handleTimeUp
-  });
-
-  // Update the submission handler with the stop timer function
-  const {
-    handleTimeUp: finalHandleTimeUp,
-    handleSubmit: finalHandleSubmit,
-    getTimeSpent: finalGetTimeSpent,
-    submissionInProgress: finalSubmissionInProgress
-  } = useExamSubmissionHandler({
-    sessionId,
+    markedForReview,
+    isFullscreen,
     questions,
-    answers,
-    timeLeft,
-    subject,
-    currentQuestion,
-    isLoading,
-    isSubmitting,
-    setIsSubmitting,
-    isMountedRef,
-    stopTimerForSubmission
-  });
-
-  const { handleAnswerChange } = useExamAnswerHandler({
     sessionId,
-    questions,
-    updateAnswer,
-    getTimeSpent: finalGetTimeSpent
-  });
-
-  const { handleQuestionNavigation, handleNext, handlePrevious } = useExamNavigationHandler({
-    currentQuestion,
+    isLoading,
     totalQuestions,
-    isLoading,
-    isSubmitting: finalSubmissionInProgress,
-    navigateToQuestion,
-    nextQuestion,
-    previousQuestion
+    isMountedRef
+  } = containerState;
+
+  const handlers = useExamHandlers({
+    ...containerState,
+    subject
   });
-
-  const { toggleFullscreen } = useExamFullscreen({ setIsFullscreen });
-
-  const { dialogs, showDialog, hideDialog } = useConfirmationDialogs();
-
-  // Create wrapper functions BEFORE using them in hooks
-  const handleMarkForReview = () => {
-    toggleMarkForReview(currentQuestion);
-  };
-
-  const handleClearResponse = () => {
-    showDialog('clearAnswer');
-  };
-
-  const handleSubmitExam = () => {
-    console.log('ExamContainer: Submit exam button clicked');
-    showDialog('submitExam');
-  };
-
-  // Time warnings hook
-  useTimeWarnings({
-    timeLeft,
-    isLoading,
-    isSubmitting: finalSubmissionInProgress
-  });
-
-  // Keyboard navigation hook
-  useKeyboardNavigation({
-    currentQuestion,
-    totalQuestions,
-    isLoading,
-    isSubmitting: finalSubmissionInProgress,
-    onNext: handleNext,
-    onPrevious: handlePrevious,
-    onMarkForReview: handleMarkForReview,
-    onClearResponse: handleClearResponse
-  });
-
-  const confirmClearAnswer = () => {
-    clearAnswer(currentQuestion);
-    hideDialog('clearAnswer');
-  };
-
-  const confirmSubmitExam = () => {
-    console.log('ExamContainer: Confirmed submit exam');
-    hideDialog('submitExam');
-    finalHandleSubmit();
-  };
 
   // Loading state
   if (isLoading || questions.length === 0) {
@@ -172,7 +50,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     totalQuestions,
     answeredCount,
     markedCount,
-    submissionInProgress: finalSubmissionInProgress,
+    submissionInProgress: handlers.submissionInProgress,
     timeLeft,
     sessionId
   });
@@ -185,43 +63,30 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
         totalQuestions={totalQuestions}
         timeLeft={timeLeft}
         isFullscreen={isFullscreen}
-        onToggleFullscreen={toggleFullscreen}
-        onSubmitExam={handleSubmitExam}
-        submissionInProgress={finalSubmissionInProgress}
+        onToggleFullscreen={handlers.toggleFullscreen}
+        onSubmitExam={handlers.handleSubmitExam}
+        submissionInProgress={handlers.submissionInProgress}
         currentQuestionData={currentQuestionData}
         answers={answers}
         isLoading={isLoading}
         markedForReview={markedForReview}
-        onAnswerChange={handleAnswerChange}
-        onMarkForReview={handleMarkForReview}
-        onClearResponse={handleClearResponse}
-        onNext={handleNext}
-        onPrevious={handlePrevious}
+        onAnswerChange={handlers.handleAnswerChange}
+        onMarkForReview={handlers.handleMarkForReview}
+        onClearResponse={handlers.handleClearResponse}
+        onNext={handlers.handleNext}
+        onPrevious={handlers.handlePrevious}
         answeredCount={answeredCount}
         markedCount={markedCount}
-        onNavigateToQuestion={handleQuestionNavigation}
+        onNavigateToQuestion={handlers.handleQuestionNavigation}
       />
 
-      {/* Confirmation Dialogs */}
-      <ConfirmationDialog
-        isOpen={dialogs.clearAnswer}
-        onClose={() => hideDialog('clearAnswer')}
-        onConfirm={confirmClearAnswer}
-        title="Clear Answer"
-        description="Are you sure you want to clear your answer for this question?"
-        confirmText="Clear"
-        cancelText="Cancel"
-      />
-
-      <ConfirmationDialog
-        isOpen={dialogs.submitExam}
-        onClose={() => hideDialog('submitExam')}
-        onConfirm={confirmSubmitExam}
-        title="Submit Exam"
-        description={`Are you sure you want to submit your exam? You have answered ${answeredCount} out of ${totalQuestions} questions. This action cannot be undone.`}
-        confirmText="Submit Exam"
-        cancelText="Continue Exam"
-        variant="destructive"
+      <ExamConfirmationDialogs
+        dialogs={handlers.dialogs}
+        onHideDialog={handlers.hideDialog}
+        onConfirmClearAnswer={handlers.confirmClearAnswer}
+        onConfirmSubmitExam={handlers.confirmSubmitExam}
+        answeredCount={answeredCount}
+        totalQuestions={totalQuestions}
       />
     </>
   );
