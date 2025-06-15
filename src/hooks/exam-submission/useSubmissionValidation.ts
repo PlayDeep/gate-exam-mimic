@@ -1,5 +1,5 @@
 
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback } from 'react';
 import { Question } from '@/services/questionService';
 
 interface ValidationProps {
@@ -11,8 +11,6 @@ interface ValidationProps {
 }
 
 export const useSubmissionValidation = () => {
-  const submissionAttemptedRef = useRef(false);
-
   const validateSubmissionState = useCallback(({
     sessionId,
     questions,
@@ -26,12 +24,6 @@ export const useSubmissionValidation = () => {
     if (isSubmitting) {
       console.error('Validation failed: Already submitting');
       return { isValid: false, error: 'Submission already in progress' };
-    }
-
-    // Check if already attempted submission
-    if (submissionAttemptedRef.current) {
-      console.error('Validation failed: Submission already attempted');
-      return { isValid: false, error: 'Submission already attempted' };
     }
 
     // Check session ID
@@ -84,17 +76,7 @@ export const useSubmissionValidation = () => {
     return { isValid: true };
   }, []);
 
-  const markSubmissionAttempted = useCallback(() => {
-    submissionAttemptedRef.current = true;
-  }, []);
-
-  const resetSubmissionAttempt = useCallback(() => {
-    submissionAttemptedRef.current = false;
-  }, []);
-
   return {
-    validateSubmissionState,
-    markSubmissionAttempted,
-    resetSubmissionAttempt
+    validateSubmissionState
   };
 };

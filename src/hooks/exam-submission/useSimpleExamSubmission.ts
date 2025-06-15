@@ -28,14 +28,9 @@ export const useSimpleExamSubmission = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const isMountedRef = useRef(true);
-  const submissionInProgressRef = useRef(false);
+  const hasSubmittedRef = useRef(false);
 
-  const {
-    validateSubmissionState,
-    markSubmissionAttempted,
-    resetSubmissionAttempt
-  } = useSubmissionValidation();
-
+  const { validateSubmissionState } = useSubmissionValidation();
   const { calculateResults } = useResultsCalculation();
 
   // Component mount tracking
@@ -48,6 +43,9 @@ export const useSimpleExamSubmission = ({
 
   const submitExam = useCallback(async () => {
     console.log('=== STARTING EXAM SUBMISSION ===');
+    console.log('Component mounted:', isMountedRef.current);
+    console.log('Has submitted:', hasSubmittedRef.current);
+    console.log('Is submitting:', isSubmitting);
     
     // Check if component is still mounted
     if (!isMountedRef.current) {
@@ -55,14 +53,20 @@ export const useSimpleExamSubmission = ({
       return;
     }
 
+    // Check if already submitted
+    if (hasSubmittedRef.current) {
+      console.log('Already submitted, aborting');
+      return;
+    }
+
     // Check if submission is already in progress
-    if (submissionInProgressRef.current) {
+    if (isSubmitting) {
       console.log('Submission already in progress, aborting');
       return;
     }
 
-    // Mark submission as in progress immediately
-    submissionInProgressRef.current = true;
+    // Mark as submitted immediately to prevent multiple calls
+    hasSubmittedRef.current = true;
     
     // Validate submission state
     const validation = validateSubmissionState({
@@ -75,7 +79,7 @@ export const useSimpleExamSubmission = ({
     
     if (!validation.isValid) {
       console.error('Submission blocked:', validation.error);
-      submissionInProgressRef.current = false;
+      hasSubmittedRef.current = false;
       
       if (isMountedRef.current) {
         toast({
@@ -87,16 +91,16 @@ export const useSimpleExamSubmission = ({
       return;
     }
 
-    // Mark submission as attempted
-    markSubmissionAttempted();
-    
+    console.log('Setting isSubmitting to true');
     if (isMountedRef.current) {
       setIsSubmitting(true);
     }
 
     try {
       // Calculate results
+      console.log('Calculating results...');
       const results = calculateResults({ questions, answers, timeLeft });
+      console.log('Results calculated:', results);
       
       console.log('=== SUBMITTING TO DATABASE ===');
       await submitTestSession(sessionId, {
@@ -158,8 +162,7 @@ export const useSimpleExamSubmission = ({
       console.error('Error details:', error);
       
       // Reset submission state on error
-      submissionInProgressRef.current = false;
-      resetSubmissionAttempt();
+      hasSubmittedRef.current = false;
       
       if (isMountedRef.current) {
         setIsSubmitting(false);
@@ -175,8 +178,7 @@ export const useSimpleExamSubmission = ({
     }
   }, [
     sessionId, questions, answers, timeLeft, subject, questionTimeData,
-    validateSubmissionState, calculateResults, markSubmissionAttempted, 
-    resetSubmissionAttempt, navigate, toast
+    validateSubmissionState, calculateResults, navigate, toast, isSubmitting
   ]);
 
   return { 

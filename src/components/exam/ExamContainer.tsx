@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useCallback } from "react";
 import { useSimpleExamState } from "@/hooks/useSimpleExamState";
 import { useExamTimer } from "@/hooks/useExamTimer";
@@ -21,7 +22,6 @@ interface ExamContainerProps {
 const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionId, subject }: ExamContainerProps) => {
   const isInitializedRef = useRef(false);
   const isMountedRef = useRef(true);
-  const submissionHandledRef = useRef(false);
   
   const {
     timeLeft,
@@ -67,26 +67,30 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
   // Sync submission states
   useEffect(() => {
+    console.log('ExamContainer: Syncing submission state:', submissionInProgress);
     setIsSubmitting(submissionInProgress);
   }, [submissionInProgress, setIsSubmitting]);
 
   const handleTimeUp = useCallback(async () => {
     console.log('ExamContainer: Time up triggered');
     
-    if (!isMountedRef.current || submissionHandledRef.current) {
-      console.log('ExamContainer: Already handled or unmounted');
+    if (!isMountedRef.current) {
+      console.log('ExamContainer: Component not mounted, aborting time up');
       return;
     }
     
-    submissionHandledRef.current = true;
+    if (submissionInProgress) {
+      console.log('ExamContainer: Submission already in progress, aborting time up');
+      return;
+    }
     
+    console.log('ExamContainer: Calling submitExam from time up');
     try {
       await submitExam();
     } catch (error) {
       console.error('ExamContainer: Time up submission failed:', error);
-      submissionHandledRef.current = false;
     }
-  }, [submitExam]);
+  }, [submitExam, submissionInProgress]);
 
   const { formattedTime } = useExamTimer({
     timeLeft,
@@ -117,8 +121,10 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
   // Component mount tracking
   useEffect(() => {
+    console.log('ExamContainer: Component mounting');
     isMountedRef.current = true;
     return () => {
+      console.log('ExamContainer: Component unmounting');
       isMountedRef.current = false;
     };
   }, []);
@@ -127,6 +133,8 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   useEffect(() => {
     if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current && isMountedRef.current) {
       console.log('ExamContainer: Initializing with props data');
+      console.log('Questions count:', initialQuestions.length);
+      console.log('Session ID:', initialSessionId);
       setQuestions(initialQuestions);
       setSessionId(initialSessionId);
       setIsLoading(false);
@@ -149,6 +157,10 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
   const handleSubmit = async () => {
     console.log('ExamContainer: Submit button clicked');
+    console.log('Component mounted:', isMountedRef.current);
+    console.log('Session ID:', sessionId);
+    console.log('Questions count:', questions.length);
+    console.log('Submission in progress:', submissionInProgress);
     
     // Enhanced validation
     if (!isMountedRef.current) {
@@ -161,21 +173,19 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
       return;
     }
 
-    if (submissionInProgress || submissionHandledRef.current) {
-      console.log('ExamContainer: Submission already in progress or handled');
+    if (submissionInProgress) {
+      console.log('ExamContainer: Submission already in progress');
       return;
     }
-
-    submissionHandledRef.current = true;
 
     // Cleanup timers before submission
     cleanupTimers();
     
+    console.log('ExamContainer: Calling submitExam from submit button');
     try {
       await submitExam();
     } catch (error) {
-      console.error('ExamContainer: Submission failed:', error);
-      submissionHandledRef.current = false;
+      console.error('ExamContainer: Manual submission failed:', error);
     }
   };
 
@@ -187,6 +197,15 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   const answeredCount = Object.keys(answers).length;
   const markedCount = markedForReview.size;
   const currentQuestionData = questions[currentQuestion - 1];
+
+  console.log('ExamContainer: Rendering with state:', {
+    currentQuestion,
+    totalQuestions,
+    answeredCount,
+    markedCount,
+    submissionInProgress,
+    timeLeft
+  });
 
   return (
     <div className="min-h-screen bg-gray-100">
