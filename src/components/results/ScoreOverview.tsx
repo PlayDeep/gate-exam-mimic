@@ -1,9 +1,9 @@
 
-import { Trophy, Clock } from "lucide-react";
+import { Trophy, Clock, TrendingUp, Target } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LineChart, Line } from "recharts";
 
 interface ScoreOverviewProps {
   score: number;
@@ -35,68 +35,94 @@ const ScoreOverview = ({
   const answeredQuestions = Object.keys(answers).length;
   const unansweredQuestions = totalQuestions - answeredQuestions;
   
-  // Convert totalTimeSpent from minutes to seconds for calculations
-  const totalTimeSpentInSeconds = totalTimeSpent * 60;
+  // Enhanced time analytics
+  const hasRealTimeData = questionTimeData && questionTimeData.length > 0 && questionTimeData.some(q => q.timeSpent > 0);
+  const questionsWithTimeData = questionTimeData.filter(q => q.timeSpent > 0);
+  const totalTimeFromQuestions = questionsWithTimeData.reduce((sum, q) => sum + q.timeSpent, 0);
   
-  // Calculate time metrics in seconds
-  const avgTimePerQuestion = totalQuestions > 0 ? Math.round(totalTimeSpentInSeconds / totalQuestions) : 0;
-  const timePerAnsweredQuestion = answeredQuestions > 0 ? Math.round(totalTimeSpentInSeconds / answeredQuestions) : 0;
+  console.log('ScoreOverview - Enhanced analytics:', {
+    hasRealTimeData,
+    questionsWithTimeData: questionsWithTimeData.length,
+    totalTimeFromQuestions,
+    questionTimeData: questionTimeData.length
+  });
   
-  // Calculate time efficiency (3 hours = 10800 seconds)
+  // Time calculations
+  const avgTimePerQuestion = questionsWithTimeData.length > 0 
+    ? Math.round(totalTimeFromQuestions / questionsWithTimeData.length) 
+    : 0;
+    
+  const answeredQuestionsWithTime = questionsWithTimeData.filter(q => answers[q.questionNumber]);
+  const avgTimePerAnswered = answeredQuestionsWithTime.length > 0
+    ? Math.round(answeredQuestionsWithTime.reduce((sum, q) => sum + q.timeSpent, 0) / answeredQuestionsWithTime.length)
+    : 0;
+  
+  // Time efficiency metrics
   const totalAvailableTime = 180 * 60; // 3 hours in seconds
-  const timeUtilization = totalTimeSpentInSeconds > 0 ? Math.round((totalTimeSpentInSeconds / totalAvailableTime) * 100) : 0;
-  const timeRemainingSeconds = Math.max(0, totalAvailableTime - totalTimeSpentInSeconds);
+  const actualTimeUsed = totalTimeFromQuestions || (totalTimeSpent * 60);
+  const timeUtilization = actualTimeUsed > 0 ? Math.round((actualTimeUsed / totalAvailableTime) * 100) : 0;
+  const timeRemainingSeconds = Math.max(0, totalAvailableTime - actualTimeUsed);
   
-  // Format time remaining
+  // Performance per minute
+  const performanceRate = actualTimeUsed > 0 ? (score / (actualTimeUsed / 60)).toFixed(2) : '0';
+  
+  // Time distribution analysis
+  const timeCategories = {
+    fast: questionsWithTimeData.filter(q => q.timeSpent < 60).length,
+    normal: questionsWithTimeData.filter(q => q.timeSpent >= 60 && q.timeSpent <= 180).length,
+    slow: questionsWithTimeData.filter(q => q.timeSpent > 180).length
+  };
+  
+  // Chart data for time per question
+  const chartData = hasRealTimeData
+    ? questionTimeData.slice(0, 20).map(item => ({
+        question: `Q${item.questionNumber}`,
+        timeSpent: item.timeSpent,
+        answered: answers[item.questionNumber] ? 1 : 0
+      }))
+    : Array.from({ length: Math.min(totalQuestions, 20) }, (_, index) => ({
+        question: `Q${index + 1}`,
+        timeSpent: answers[index + 1] ? Math.floor(Math.random() * 150) + 30 : 0,
+        answered: answers[index + 1] ? 1 : 0
+      }));
+
+  // Time progression chart data
+  const progressionData = hasRealTimeData
+    ? questionTimeData.slice(0, 10).map((item, index) => ({
+        order: index + 1,
+        time: item.timeSpent,
+        cumulative: questionTimeData.slice(0, index + 1).reduce((sum, q) => sum + q.timeSpent, 0)
+      }))
+    : [];
+
   const formatTimeRemaining = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
     
     if (hours > 0) {
-      return `${hours}h ${mins}m ${secs}s`;
+      return `${hours}h ${mins}m`;
     } else if (mins > 0) {
       return `${mins}m ${secs}s`;
     } else {
       return `${secs}s`;
     }
   };
-  
-  // Check if we have real time data
-  const hasRealTimeData = questionTimeData && questionTimeData.length > 0 && questionTimeData.some(q => q.timeSpent > 0);
-  
-  console.log('ScoreOverview - Question time data:', questionTimeData);
-  console.log('ScoreOverview - Has real time data:', hasRealTimeData);
-  
-  // Use real time data if available, otherwise generate fallback
-  const chartData = hasRealTimeData
-    ? questionTimeData.slice(0, 20).map(item => ({
-        question: `Q${item.questionNumber}`,
-        timeSpent: item.timeSpent
-      }))
-    : Array.from({ length: Math.min(totalQuestions, 20) }, (_, index) => ({
-        question: `Q${index + 1}`,
-        timeSpent: answers[index + 1] ? Math.floor(Math.random() * 150) + 30 : 0
-      }));
 
-  // Calculate time distribution from real data
-  const answeredQuestionsWithTime = hasRealTimeData 
-    ? questionTimeData.filter(q => answers[q.questionNumber] && q.timeSpent > 0)
-    : [];
-    
-  const fastQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent < 30).length;
-  const mediumQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent >= 30 && q.timeSpent <= 90).length;
-  const slowQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent > 90).length;
-
-  // If no real time data, use fallback calculations
-  const fallbackFast = hasRealTimeData ? fastQuestions : Math.floor(answeredQuestions * 0.3);
-  const fallbackMedium = hasRealTimeData ? mediumQuestions : Math.floor(answeredQuestions * 0.5);
-  const fallbackSlow = hasRealTimeData ? slowQuestions : Math.floor(answeredQuestions * 0.2);
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
 
   const chartConfig = {
     timeSpent: {
       label: "Time Spent",
       color: "hsl(217, 91%, 60%)",
+    },
+    cumulative: {
+      label: "Cumulative Time",
+      color: "hsl(142, 76%, 36%)",
     },
   };
 
@@ -111,7 +137,7 @@ const ScoreOverview = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div className="text-center">
               <div className="text-4xl font-bold text-gray-900 mb-2">
                 {score}/{maxScore}
@@ -130,6 +156,12 @@ const ScoreOverview = ({
               </div>
               <div className="text-lg text-gray-600">{gradeInfo.description}</div>
             </div>
+            <div className="text-center">
+              <div className="text-4xl font-bold mb-2 text-blue-600">
+                {performanceRate}
+              </div>
+              <div className="text-lg text-gray-600">Points/Min</div>
+            </div>
           </div>
           
           <div className="space-y-4">
@@ -142,19 +174,47 @@ const ScoreOverview = ({
         </CardContent>
       </Card>
 
-      {/* Time Analysis Card */}
+      {/* Enhanced Time Analysis Card */}
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Clock className="w-6 h-6 text-blue-500" />
-            <span>Time Analysis {hasRealTimeData ? '(Real Data)' : '(Simulated Data)'}</span>
+            <span>Enhanced Time Analytics {hasRealTimeData ? '(Real Data)' : '(Simulated)'}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {/* Time Chart */}
+            {/* Time Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {formatTime(actualTimeUsed)}
+                </div>
+                <div className="text-sm text-gray-600">Total Time Used</div>
+              </div>
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {formatTime(avgTimePerQuestion)}
+                </div>
+                <div className="text-sm text-gray-600">Avg per Question</div>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-600">
+                  {formatTime(avgTimePerAnswered)}
+                </div>
+                <div className="text-sm text-gray-600">Avg per Answered</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {timeUtilization}%
+                </div>
+                <div className="text-sm text-gray-600">Time Efficiency</div>
+              </div>
+            </div>
+
+            {/* Time Distribution Chart */}
             <div className="w-full">
-              <h4 className="font-medium text-gray-800 mb-4">Time per Question (First 20 Questions)</h4>
+              <h4 className="font-medium text-gray-800 mb-4">Time per Question Analysis</h4>
               <div className="w-full h-64">
                 <ChartContainer config={chartConfig} className="w-full h-full">
                   <ResponsiveContainer width="100%" height="100%">
@@ -176,7 +236,10 @@ const ScoreOverview = ({
                       />
                       <ChartTooltip 
                         content={<ChartTooltipContent />}
-                        formatter={(value: number) => [`${value}s`, "Time Spent"]}
+                        formatter={(value: number, name: string) => {
+                          if (name === 'timeSpent') return [`${value}s`, "Time Spent"];
+                          return [`${value ? 'Answered' : 'Not Answered'}`, "Status"];
+                        }}
                         labelFormatter={(label) => `Question ${label.replace('Q', '')}`}
                       />
                       <Bar 
@@ -190,104 +253,134 @@ const ScoreOverview = ({
               </div>
             </div>
 
-            {/* Summary Statistics */}
+            {/* Time Progression Analysis */}
+            {hasRealTimeData && progressionData.length > 0 && (
+              <div className="w-full">
+                <h4 className="font-medium text-gray-800 mb-4">Time Progression (First 10 Questions)</h4>
+                <div className="w-full h-64">
+                  <ChartContainer config={chartConfig} className="w-full h-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={progressionData}>
+                        <XAxis dataKey="order" />
+                        <YAxis />
+                        <ChartTooltip 
+                          content={<ChartTooltipContent />}
+                          formatter={(value: number, name: string) => [
+                            `${Math.round(value / 60)}m ${value % 60}s`, 
+                            name === 'time' ? 'Question Time' : 'Cumulative Time'
+                          ]}
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="time" 
+                          stroke="var(--color-timeSpent)" 
+                          strokeWidth={2}
+                          name="time"
+                        />
+                        <Line 
+                          type="monotone" 
+                          dataKey="cumulative" 
+                          stroke="var(--color-cumulative)" 
+                          strokeWidth={2}
+                          name="cumulative"
+                          strokeDasharray="5 5"
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </ChartContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Enhanced Time Distribution and Insights */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <h4 className="font-medium text-gray-800">Time Summary</h4>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Time:</span>
-                  <span className="font-semibold">{timeSpentFormatted}</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Time Remaining:</span>
-                  <span className="font-semibold text-green-600">
-                    {formatTimeRemaining(timeRemainingSeconds)}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Time Utilization:</span>
-                  <span className={`font-semibold ${timeUtilization > 90 ? 'text-red-500' : timeUtilization > 70 ? 'text-yellow-500' : 'text-green-500'}`}>
-                    {timeUtilization}%
-                  </span>
+              <div className="space-y-4">
+                <h4 className="font-medium text-gray-800">Time Distribution Pattern</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center">
+                    <div className="font-semibold text-green-600 text-xl">{timeCategories.fast}</div>
+                    <div className="text-xs text-gray-600">Quick (&lt;1m)</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-yellow-600 text-xl">{timeCategories.normal}</div>
+                    <div className="text-xs text-gray-600">Normal (1-3m)</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-semibold text-red-600 text-xl">{timeCategories.slow}</div>
+                    <div className="text-xs text-gray-600">Slow (&gt;3m)</div>
+                  </div>
                 </div>
               </div>
               
               <div className="space-y-3">
-                <h4 className="font-medium text-gray-800">Question Analysis</h4>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Avg per Question:</span>
-                  <span className="font-semibold">{Math.floor(avgTimePerQuestion / 60)}m {avgTimePerQuestion % 60}s</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Avg per Answered:</span>
-                  <span className="font-semibold">{Math.floor(timePerAnsweredQuestion / 60)}m {timePerAnsweredQuestion % 60}s</span>
-                </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Questions Answered:</span>
-                  <span className="font-semibold">{answeredQuestions}/{totalQuestions}</span>
+                <h4 className="font-medium text-gray-800">Performance Metrics</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Questions Attempted:</span>
+                    <span className="font-semibold">{answeredQuestions}/{totalQuestions}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Time Remaining:</span>
+                    <span className={`font-semibold ${timeRemainingSeconds > 3600 ? 'text-green-600' : 'text-yellow-600'}`}>
+                      {formatTimeRemaining(timeRemainingSeconds)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Data Coverage:</span>
+                    <span className="font-semibold">
+                      {Math.round((questionsWithTimeData.length / totalQuestions) * 100)}%
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
             
-            {/* Time Distribution */}
+            {/* Enhanced Performance Insights */}
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-800">Time Distribution {hasRealTimeData ? '(Real Data)' : '(Estimated)'}</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="font-semibold text-green-600 text-xl">{fallbackFast}</div>
-                  <div className="text-sm text-gray-600">Quick (&lt;30s)</div>
+              <h4 className="font-medium text-gray-800">Performance Insights</h4>
+              
+              {/* Efficiency insights */}
+              {parseFloat(performanceRate) > 0.5 && (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800">
+                    <TrendingUp className="inline w-4 h-4 mr-1" />
+                    <strong>Excellent pace:</strong> {performanceRate} points per minute shows efficient problem-solving.
+                  </p>
                 </div>
-                <div className="text-center">
-                  <div className="font-semibold text-yellow-600 text-xl">{fallbackMedium}</div>
-                  <div className="text-sm text-gray-600">Medium (30-90s)</div>
+              )}
+              
+              {timeCategories.slow > timeCategories.fast && (
+                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    <Target className="inline w-4 h-4 mr-1" />
+                    <strong>Time management tip:</strong> Consider spending less time on difficult questions initially.
+                  </p>
                 </div>
-                <div className="text-center">
-                  <div className="font-semibold text-red-600 text-xl">{fallbackSlow}</div>
-                  <div className="text-sm text-gray-600">Slow (&gt;90s)</div>
+              )}
+              
+              {timeUtilization < 50 && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <Clock className="inline w-4 h-4 mr-1" />
+                    <strong>Time opportunity:</strong> You have {formatTimeRemaining(timeRemainingSeconds)} remaining for review.
+                  </p>
                 </div>
-                <div className="text-center">
-                  <div className="font-semibold text-gray-500 text-xl">{unansweredQuestions}</div>
-                  <div className="text-sm text-gray-600">Unanswered</div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Performance Tips */}
-            {timeUtilization > 85 && (
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <strong>Tip:</strong> You used {timeUtilization}% of available time. Consider time management strategies for better performance.
-                </p>
-              </div>
-            )}
-            
-            {avgTimePerQuestion > 120 && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Suggestion:</strong> Average {Math.floor(avgTimePerQuestion / 60)}m {avgTimePerQuestion % 60}s per question. Aim for 2-3 minutes per question for optimal time usage.
-                </p>
-              </div>
-            )}
+              )}
 
-            {hasRealTimeData ? (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">
-                  <strong>Note:</strong> Time analysis is based on actual time spent on each question, including revisits.
-                </p>
-              </div>
-            ) : (
-              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <p className="text-sm text-orange-800">
-                  <strong>Note:</strong> Time analysis is based on estimated data as real time tracking data was not available.
-                </p>
-              </div>
-            )}
+              {hasRealTimeData ? (
+                <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-800">
+                    <strong>Real-time tracking:</strong> Analysis based on actual time spent on {questionsWithTimeData.length} questions.
+                  </p>
+                </div>
+              ) : (
+                <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                  <p className="text-sm text-orange-800">
+                    <strong>Estimated data:</strong> Time analysis is simulated. Enable detailed tracking for better insights.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -47,13 +47,13 @@ export const useSubmissionProcess = ({
     console.log('Has submitted:', hasSubmitted());
     console.log('Is submitting:', isSubmitting);
     console.log('Submission lock:', isLocked());
-    console.log('Session data:', {
-      sessionId,
-      questionsCount: questions.length,
-      answersCount: Object.keys(answers).length,
-      timeLeft,
-      subject,
-      timeDataCount: questionTimeData.length
+    
+    // Enhanced logging for time data
+    console.log('Time analytics data:', {
+      questionTimeDataLength: questionTimeData.length,
+      totalTimeFromData: questionTimeData.reduce((sum, q) => sum + q.timeSpent, 0),
+      questionsWithTime: questionTimeData.filter(q => q.timeSpent > 0).length,
+      timeDataSample: questionTimeData.slice(0, 3)
     });
 
     // Acquire lock to prevent concurrent submissions
@@ -105,41 +105,72 @@ export const useSubmissionProcess = ({
         setIsSubmitting(true);
       }
 
-      // Calculate results
+      // Calculate results with enhanced time tracking
       console.log('Calculating results...');
       const results = calculateResults({ questions, answers, timeLeft });
       console.log('Results calculated:', results);
       
-      // Prepare comprehensive submission data
+      // Calculate comprehensive time metrics
+      const totalTimeFromQuestions = questionTimeData.reduce((sum, q) => sum + q.timeSpent, 0);
+      const averageTimePerQuestion = questionTimeData.length > 0 
+        ? Math.round(totalTimeFromQuestions / questionTimeData.length) 
+        : 0;
+      
+      const answeredQuestionsTime = questionTimeData.filter(q => 
+        answers[q.questionNumber] && answers[q.questionNumber].trim() !== ''
+      );
+      
+      const averageTimePerAnswered = answeredQuestionsTime.length > 0
+        ? Math.round(answeredQuestionsTime.reduce((sum, q) => sum + q.timeSpent, 0) / answeredQuestionsTime.length)
+        : 0;
+
+      // Prepare comprehensive submission data with enhanced analytics
       const submissionData = {
         end_time: new Date().toISOString(),
         answered_questions: results.answeredQuestions,
         score: results.totalScore,
         percentage: results.percentage,
-        time_taken: results.timeTakenInMinutes
+        time_taken: results.timeTakenInMinutes,
+        // Enhanced time analytics
+        total_time_on_questions: Math.round(totalTimeFromQuestions / 60), // in minutes
+        average_time_per_question: averageTimePerQuestion,
+        average_time_per_answered: averageTimePerAnswered,
+        questions_with_time_data: questionTimeData.length,
+        time_efficiency_score: results.timeTakenInMinutes > 0 
+          ? Math.round((results.answeredQuestions / results.timeTakenInMinutes) * 100) / 100 
+          : 0
       };
       
       console.log('=== SUBMITTING TO DATABASE ===');
-      console.log('Submission data:', submissionData);
-      console.log('Question time data being stored:', questionTimeData);
+      console.log('Enhanced submission data:', submissionData);
+      console.log('Question time analytics being stored:', {
+        totalQuestions: questionTimeData.length,
+        questionsWithData: questionTimeData.filter(q => q.timeSpent > 0).length,
+        totalTimeSpent: totalTimeFromQuestions,
+        averageTime: averageTimePerQuestion
+      });
       
       await submitTestSession(sessionId, submissionData);
 
-      console.log('Database submission successful');
+      console.log('Database submission successful with enhanced analytics');
 
       if (isMounted()) {
         toast({
           title: "Exam Submitted Successfully",
-          description: `Score: ${results.totalScore}/${results.maxPossibleScore} (${results.percentage}%)`,
+          description: `Score: ${results.totalScore}/${results.maxPossibleScore} (${results.percentage}%) | Time: ${Math.round(totalTimeFromQuestions / 60)}m`,
         });
       }
 
-      // Navigate to results with all data
+      // Navigate to results with comprehensive data
       if (isMounted()) {
-        console.log('Navigating to results with comprehensive data');
+        console.log('Navigating to results with enhanced time analytics');
         navigateToResults({
           ...results,
-          questionTimeData
+          questionTimeData,
+          totalTimeSpent: totalTimeFromQuestions,
+          averageTimePerQuestion,
+          averageTimePerAnswered,
+          timeEfficiency: submissionData.time_efficiency_score
         });
       }
       

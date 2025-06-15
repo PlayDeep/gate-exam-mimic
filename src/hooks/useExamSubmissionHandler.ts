@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useSimpleExamSubmission } from "@/hooks/useSimpleExamSubmission";
 import { useExamTimerManager } from "@/hooks/useExamTimerManager";
@@ -73,12 +72,16 @@ export const useExamSubmissionHandler = ({
     isSubmitting
   }), [currentQuestion, isLoading, isSubmitting]);
 
-  const { getTimeSpent, getAllTimeData, cleanupTimers } = useExamTimerManager(timerManagerProps);
+  const { getTimeSpent, getEnhancedTimeData, cleanupTimers } = useExamTimerManager(timerManagerProps);
 
-  // Create stable submission props with proper time data
+  // Enhanced submission props with better time data
   const submissionProps = useMemo(() => {
-    const timeData = getAllTimeData();
-    console.log('ExamSubmissionHandler: Creating submission props with time data:', timeData);
+    const enhancedTimeData = getEnhancedTimeData();
+    console.log('ExamSubmissionHandler: Creating enhanced submission props:', {
+      basicTimeData: enhancedTimeData.questionTimeData.length,
+      totalSessionTime: enhancedTimeData.totalSessionTime,
+      isTracking: enhancedTimeData.isCurrentlyTracking
+    });
     
     return {
       sessionId: sessionIdRef.current,
@@ -86,23 +89,31 @@ export const useExamSubmissionHandler = ({
       answers,
       timeLeft,
       subject: subjectRef.current,
-      questionTimeData: timeData
+      questionTimeData: enhancedTimeData.questionTimeData
     };
-  }, [answers, timeLeft, getAllTimeData]);
+  }, [answers, timeLeft, getEnhancedTimeData]);
 
   const { submitExam, isSubmitting: submissionInProgress } = useSimpleExamSubmission(submissionProps);
 
-  // Stable submission callback with comprehensive data logging
+  // Enhanced submission callback with comprehensive logging
   const performSubmission = useCallback(async (source: string) => {
-    console.log(`ExamSubmissionHandler: Starting submission from ${source}`);
-    console.log('ExamSubmissionHandler: Current submission state:', {
-      isMounted: isMountedRef.current,
-      submissionInProgress,
-      sessionId: sessionIdRef.current,
-      questionsCount: questionsRef.current.length,
-      answersCount: Object.keys(answers).length,
-      timeLeft,
-      subject: subjectRef.current
+    console.log(`ExamSubmissionHandler: Enhanced submission from ${source}`);
+    
+    // Get final enhanced time data
+    const finalEnhancedData = getEnhancedTimeData();
+    console.log('ExamSubmissionHandler: Final enhanced time analytics:', {
+      source,
+      questionsWithTime: finalEnhancedData.questionTimeData.length,
+      totalTime: finalEnhancedData.questionTimeData.reduce((sum, q) => sum + q.timeSpent, 0),
+      sessionTime: finalEnhancedData.totalSessionTime,
+      currentlyTracking: finalEnhancedData.isCurrentlyTracking,
+      submissionState: {
+        isMounted: isMountedRef.current,
+        submissionInProgress,
+        sessionId: sessionIdRef.current,
+        questionsCount: questionsRef.current.length,
+        answersCount: Object.keys(answers).length
+      }
     });
     
     if (!isMountedRef.current || submissionInProgress || !sessionIdRef.current || questionsRef.current.length === 0) {
@@ -110,25 +121,26 @@ export const useExamSubmissionHandler = ({
       return;
     }
     
-    // Get final time data before cleanup
-    const finalTimeData = getAllTimeData();
-    console.log('ExamSubmissionHandler: Final time data before submission:', finalTimeData);
-    
-    // Stop all timers before submission
+    // Stop all timers and get final data
     if (stopTimerRef.current) {
-      console.log('ExamSubmissionHandler: Stopping timer for submission');
+      console.log('ExamSubmissionHandler: Stopping main timer for submission');
       stopTimerRef.current();
     }
-    cleanupTimers();
+    
+    const finalTimeData = cleanupTimers();
+    console.log('ExamSubmissionHandler: Final cleanup completed, time data:', {
+      finalDataLength: finalTimeData.length,
+      totalTimeTracked: finalTimeData.reduce((sum, q) => sum + q.timeSpent, 0)
+    });
     
     try {
       await submitExam();
-      console.log('ExamSubmissionHandler: Submission completed successfully');
+      console.log('ExamSubmissionHandler: Enhanced submission completed successfully');
     } catch (error) {
-      console.error(`ExamSubmissionHandler: ${source} submission failed:`, error);
-      throw error; // Re-throw to allow proper error handling
+      console.error(`ExamSubmissionHandler: Enhanced ${source} submission failed:`, error);
+      throw error;
     }
-  }, [submitExam, submissionInProgress, cleanupTimers, isMountedRef, answers, timeLeft, getAllTimeData]);
+  }, [submitExam, submissionInProgress, cleanupTimers, isMountedRef, answers, timeLeft, getEnhancedTimeData]);
 
   const handleTimeUp = useCallback(async () => {
     console.log('ExamSubmissionHandler: Time up triggered');

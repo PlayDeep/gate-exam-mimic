@@ -1,5 +1,5 @@
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useQuestionTimer } from '@/hooks/useQuestionTimer';
 
 interface UseExamTimerManagerProps {
@@ -20,71 +20,139 @@ export const useExamTimerManager = ({
   const currentQuestionRef = useRef(0);
   const isActiveRef = useRef(false);
   const sessionIdRef = useRef('');
+  const lastQuestionRef = useRef(0);
   
   const { 
     startTimer, 
     stopTimer, 
     getTimeSpent, 
-    getAllTimeData 
+    getAllTimeData,
+    getDetailedTimeData,
+    resetTimers,
+    getTotalSessionTime
   } = useQuestionTimer();
 
-  // Reset when session changes
+  // Enhanced session management
   useEffect(() => {
     if (sessionId && sessionId !== sessionIdRef.current) {
-      console.log('TimerManager: New session, resetting question timer');
+      console.log('TimerManager: New session detected, resetting timers');
+      console.log('TimerManager: Previous session:', sessionIdRef.current);
+      console.log('TimerManager: New session:', sessionId);
+      
+      // Reset all timers for new session
+      resetTimers();
       currentQuestionRef.current = 0;
+      lastQuestionRef.current = 0;
       isActiveRef.current = false;
       sessionIdRef.current = sessionId;
     }
-  }, [sessionId]);
+  }, [sessionId, resetTimers]);
 
-  // Manage question timer based on current question
+  // Enhanced question timer management
   useEffect(() => {
-    // Don't start timer if conditions aren't met
+    // Skip if not ready
     if (isLoading || !sessionId || questionsLength === 0 || isSubmitting) {
       if (isActiveRef.current) {
-        console.log('TimerManager: Stopping timer due to conditions');
+        console.log('TimerManager: Pausing timer due to conditions:', {
+          isLoading,
+          sessionId: !!sessionId,
+          questionsLength,
+          isSubmitting
+        });
         stopTimer();
         isActiveRef.current = false;
       }
       return;
     }
 
-    // Only change timer if question actually changed
+    // Only process if question actually changed
     if (currentQuestionRef.current !== currentQuestion) {
-      console.log('TimerManager: Question changed from', currentQuestionRef.current, 'to', currentQuestion);
+      console.log('TimerManager: Question transition:', {
+        from: currentQuestionRef.current,
+        to: currentQuestion,
+        wasActive: isActiveRef.current
+      });
       
-      // Stop previous timer if running
+      // Stop current timer if running
       if (isActiveRef.current) {
+        console.log('TimerManager: Stopping timer for question', currentQuestionRef.current);
         stopTimer();
       }
       
-      // Start new timer for current question
-      startTimer(currentQuestion);
-      currentQuestionRef.current = currentQuestion;
-      isActiveRef.current = true;
+      // Start timer for new question
+      if (currentQuestion > 0 && currentQuestion <= questionsLength) {
+        console.log('TimerManager: Starting timer for question', currentQuestion);
+        startTimer(currentQuestion);
+        isActiveRef.current = true;
+        currentQuestionRef.current = currentQuestion;
+        lastQuestionRef.current = currentQuestion;
+      }
     }
   }, [currentQuestion, isLoading, questionsLength, sessionId, isSubmitting, startTimer, stopTimer]);
 
-  const cleanupTimers = () => {
-    console.log('TimerManager: Cleanup called');
+  // Enhanced cleanup with better logging
+  const cleanupTimers = useCallback(() => {
+    console.log('TimerManager: Comprehensive cleanup initiated');
+    console.log('TimerManager: Current state:', {
+      currentQuestion: currentQuestionRef.current,
+      isActive: isActiveRef.current,
+      lastQuestion: lastQuestionRef.current,
+      sessionId: sessionIdRef.current
+    });
+    
     if (isActiveRef.current) {
+      console.log('TimerManager: Stopping active timer before cleanup');
       stopTimer();
       isActiveRef.current = false;
     }
-  };
+    
+    // Get final time data before cleanup
+    const finalTimeData = getAllTimeData();
+    console.log('TimerManager: Final time data before cleanup:', {
+      questionsWithTime: finalTimeData.length,
+      totalTime: finalTimeData.reduce((sum, q) => sum + q.timeSpent, 0)
+    });
+    
+    return finalTimeData;
+  }, [stopTimer, getAllTimeData]);
+
+  // Enhanced time data retrieval with validation
+  const getEnhancedTimeData = useCallback(() => {
+    const timeData = getAllTimeData();
+    const detailedData = getDetailedTimeData();
+    const totalSessionTime = getTotalSessionTime();
+    
+    console.log('TimerManager: Enhanced time data retrieved:', {
+      basicTimeData: timeData.length,
+      detailedData: detailedData.length,
+      totalSessionTime,
+      currentlyActive: isActiveRef.current,
+      currentQuestion: currentQuestionRef.current
+    });
+    
+    return {
+      questionTimeData: timeData,
+      detailedTimeData,
+      totalSessionTime,
+      isCurrentlyTracking: isActiveRef.current,
+      currentQuestion: currentQuestionRef.current
+    };
+  }, [getAllTimeData, getDetailedTimeData, getTotalSessionTime]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      console.log('TimerManager: Component unmounting');
+      console.log('TimerManager: Component unmounting, performing cleanup');
       cleanupTimers();
     };
-  }, []);
+  }, [cleanupTimers]);
 
   return {
     getTimeSpent,
     getAllTimeData,
-    cleanupTimers
+    getEnhancedTimeData,
+    cleanupTimers,
+    isActivelyTracking: isActiveRef.current,
+    currentTrackedQuestion: currentQuestionRef.current
   };
 };
