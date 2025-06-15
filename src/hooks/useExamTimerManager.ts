@@ -132,7 +132,7 @@ export const useExamTimerManager = ({
     
     return {
       questionTimeData: timeData,
-      detailedTimeData,
+      detailedTimeData: detailedData,
       totalSessionTime,
       isCurrentlyTracking: isActiveRef.current,
       currentQuestion: currentQuestionRef.current
