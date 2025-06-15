@@ -16,6 +16,11 @@ export const useSimpleExamState = () => {
   const totalQuestions = questions.length > 0 ? Math.min(questions.length, 65) : 0;
 
   const clearAnswer = () => {
+    if (isSubmitting) {
+      console.log('Cannot clear answer: submission in progress');
+      return;
+    }
+    
     setAnswers(prev => {
       const newAnswers = { ...prev };
       delete newAnswers[currentQuestion];
@@ -24,24 +29,44 @@ export const useSimpleExamState = () => {
   };
 
   const navigateToQuestion = (questionNum: number) => {
+    if (isSubmitting) {
+      console.log('Cannot navigate: submission in progress');
+      return;
+    }
+    
     if (questionNum >= 1 && questionNum <= totalQuestions) {
       setCurrentQuestion(questionNum);
     }
   };
 
   const nextQuestion = () => {
+    if (isSubmitting) {
+      console.log('Cannot navigate next: submission in progress');
+      return;
+    }
+    
     if (currentQuestion < totalQuestions) {
       setCurrentQuestion(prev => prev + 1);
     }
   };
 
   const previousQuestion = () => {
+    if (isSubmitting) {
+      console.log('Cannot navigate previous: submission in progress');
+      return;
+    }
+    
     if (currentQuestion > 1) {
       setCurrentQuestion(prev => prev - 1);
     }
   };
 
   const toggleMarkForReview = () => {
+    if (isSubmitting) {
+      console.log('Cannot mark for review: submission in progress');
+      return;
+    }
+    
     setMarkedForReview(prev => {
       const newSet = new Set(prev);
       if (newSet.has(currentQuestion)) {
@@ -54,6 +79,11 @@ export const useSimpleExamState = () => {
   };
 
   const updateAnswer = (questionId: number, answer: string) => {
+    if (isSubmitting) {
+      console.log('Cannot update answer: submission in progress');
+      return;
+    }
+    
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
   };
 

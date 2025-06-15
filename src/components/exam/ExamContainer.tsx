@@ -37,6 +37,8 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     setSessionId,
     isLoading,
     setIsLoading,
+    isSubmitting,
+    setIsSubmitting,
     totalQuestions,
     clearAnswer,
     navigateToQuestion,
@@ -51,10 +53,10 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     isLoading,
     questionsLength: questions.length,
     sessionId,
-    isSubmitting: false
+    isSubmitting
   });
 
-  const { submitExam, isSubmitting } = useSimpleExamSubmission({
+  const { submitExam, isSubmitting: submissionInProgress } = useSimpleExamSubmission({
     sessionId,
     questions,
     answers,
@@ -62,6 +64,11 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     subject,
     questionTimeData: getAllTimeData()
   });
+
+  // Sync submission states
+  useEffect(() => {
+    setIsSubmitting(submissionInProgress);
+  }, [submissionInProgress, setIsSubmitting]);
 
   const { formattedTime } = useExamTimer({
     timeLeft,
@@ -82,7 +89,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     currentQuestion,
     totalQuestions,
     isLoading,
-    isSubmitting,
+    isSubmitting: submissionInProgress,
     navigateToQuestion,
     nextQuestion,
     previousQuestion
@@ -98,7 +105,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     };
   }, []);
 
-  // Initialize with props - simplified approach
+  // Initialize with props
   useEffect(() => {
     if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current && isMountedRef.current) {
       console.log('ExamContainer: Initializing with props data');
@@ -125,11 +132,23 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   const handleSubmit = async () => {
     console.log('ExamContainer: Submit button clicked');
     
-    if (!sessionId || questions.length === 0 || isSubmitting || !isMountedRef.current) {
-      console.log('ExamContainer: Invalid state for submission');
+    // Enhanced validation
+    if (!isMountedRef.current) {
+      console.log('ExamContainer: Component not mounted');
       return;
     }
 
+    if (!sessionId || questions.length === 0) {
+      console.log('ExamContainer: Invalid state - sessionId:', !!sessionId, 'questions:', questions.length);
+      return;
+    }
+
+    if (submissionInProgress) {
+      console.log('ExamContainer: Submission already in progress');
+      return;
+    }
+
+    // Cleanup timers before submission
     cleanupTimers();
     
     try {
@@ -159,7 +178,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
         onToggleFullscreen={toggleFullscreen}
         onOpenCalculator={openCalculator}
         onSubmitExam={handleSubmit}
-        isSubmitting={isSubmitting}
+        isSubmitting={submissionInProgress}
       />
 
       <div className="flex h-[calc(100vh-73px)]">
