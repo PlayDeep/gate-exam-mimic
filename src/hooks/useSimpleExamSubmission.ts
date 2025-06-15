@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Question } from '@/services/questionService';
@@ -63,6 +62,7 @@ export const useSimpleExamSubmission = ({
     console.log('Subject:', subject);
     
     setIsSubmitting(true);
+    let hasError = false;
 
     try {
       const totalQuestions = questions.length;
@@ -193,6 +193,7 @@ export const useSimpleExamSubmission = ({
       console.error('=== SUBMISSION ERROR ===');
       console.error('Error details:', error);
       
+      hasError = true;
       const errorMessage = error instanceof Error ? error.message : "Failed to submit the test. Please try again.";
       
       toast({
@@ -200,12 +201,10 @@ export const useSimpleExamSubmission = ({
         description: errorMessage,
         variant: "destructive",
       });
-
-      // Reset submitting state on error to allow retry
-      setIsSubmitting(false);
     } finally {
-      // Only set to false if no error occurred (successful submission should not reset this)
-      if (!error) {
+      // Only reset submitting state if there was an error (to allow retry)
+      // For successful submissions, keep isSubmitting true to prevent duplicate submissions
+      if (hasError) {
         setIsSubmitting(false);
       }
       console.log('=== SUBMISSION PROCESS COMPLETED ===');
