@@ -26,39 +26,43 @@ const AdminDashboard: React.FC = () => {
     try {
       console.log('Fetching dashboard stats...');
       
-      // Fetch users count using count query
-      const { count: usersCount, error: usersError } = await supabase
+      // Fetch users count - using regular select and counting the array
+      const { data: usersData, error: usersError } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true });
+        .select('id');
 
-      // Fetch questions count using count query
-      const { count: questionsCount, error: questionsError } = await supabase
+      // Fetch questions count - using regular select and counting the array
+      const { data: questionsData, error: questionsError } = await supabase
         .from('questions')
-        .select('*', { count: 'exact', head: true });
+        .select('id');
 
-      // Fetch completed tests count using count query
-      const { count: completedTestsCount, error: testsError } = await supabase
+      // Fetch completed tests count - using regular select and counting the array
+      const { data: completedTestsData, error: testsError } = await supabase
         .from('test_sessions')
-        .select('*', { count: 'exact', head: true })
+        .select('id')
         .eq('status', 'completed');
 
       if (usersError) {
-        console.error('Error fetching users count:', usersError);
+        console.error('Error fetching users:', usersError);
       }
       if (questionsError) {
-        console.error('Error fetching questions count:', questionsError);
+        console.error('Error fetching questions:', questionsError);
       }
       if (testsError) {
-        console.error('Error fetching tests count:', testsError);
+        console.error('Error fetching tests:', testsError);
       }
 
       const newStats = {
-        totalUsers: usersCount || 0,
-        totalQuestions: questionsCount || 0,
-        testsCompleted: completedTestsCount || 0
+        totalUsers: usersData?.length || 0,
+        totalQuestions: questionsData?.length || 0,
+        testsCompleted: completedTestsData?.length || 0
       };
 
       console.log('Dashboard stats:', newStats);
+      console.log('Users data:', usersData);
+      console.log('Questions data:', questionsData);
+      console.log('Completed tests data:', completedTestsData);
+      
       setStats(newStats);
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
