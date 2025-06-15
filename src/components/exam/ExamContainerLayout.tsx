@@ -50,10 +50,6 @@ const ExamContainerLayout = ({
   onNavigateToQuestion
 }: ExamContainerLayoutProps) => {
   
-  const openCalculator = () => {
-    window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
-  };
-
   return (
     <div className="min-h-screen bg-gray-100">
       <ExamHeader
@@ -63,7 +59,6 @@ const ExamContainerLayout = ({
         timeLeft={timeLeft}
         isFullscreen={isFullscreen}
         onToggleFullscreen={onToggleFullscreen}
-        onOpenCalculator={openCalculator}
         onSubmitExam={onSubmitExam}
         isSubmitting={submissionInProgress}
       />

@@ -103,6 +103,19 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
   const { dialogs, showDialog, hideDialog } = useConfirmationDialogs();
 
+  // Create wrapper functions BEFORE using them in hooks
+  const handleMarkForReview = () => {
+    toggleMarkForReview(currentQuestion);
+  };
+
+  const handleClearResponse = () => {
+    showDialog('clearAnswer');
+  };
+
+  const handleSubmitExam = () => {
+    showDialog('submitExam');
+  };
+
   // Time warnings hook
   useTimeWarnings({
     timeLeft,
@@ -119,26 +132,12 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     onNext: handleNext,
     onPrevious: handlePrevious,
     onMarkForReview: handleMarkForReview,
-    onClearResponse: () => showDialog('clearAnswer')
+    onClearResponse: handleClearResponse
   });
-
-  // Create a wrapper function for clearing the current question's answer
-  const handleClearResponse = () => {
-    showDialog('clearAnswer');
-  };
 
   const confirmClearAnswer = () => {
     clearAnswer(currentQuestion);
     hideDialog('clearAnswer');
-  };
-
-  // Create a wrapper function for marking the current question for review
-  const handleMarkForReview = () => {
-    toggleMarkForReview(currentQuestion);
-  };
-
-  const handleSubmitExam = () => {
-    showDialog('submitExam');
   };
 
   const confirmSubmitExam = () => {
