@@ -41,7 +41,7 @@ export const useExamSubmissionHandler = ({
     isSubmitting
   });
 
-  // Memoize the submission props to prevent constant re-creation
+  // Stable memoized submission props - only update when actual values change
   const submissionProps = useMemo(() => ({
     sessionId,
     questions,
@@ -53,7 +53,7 @@ export const useExamSubmissionHandler = ({
 
   const { submitExam, isSubmitting: submissionInProgress } = useSimpleExamSubmission(submissionProps);
 
-  // Stable callback for submission
+  // Stable callback for submission - memoize with stable dependencies
   const performSubmission = useCallback(async (source: string) => {
     console.log(`ExamSubmissionHandler: Starting submission from ${source}`);
     
@@ -76,6 +76,7 @@ export const useExamSubmissionHandler = ({
     }
   }, [submitExam, submissionInProgress, cleanupTimers, stopTimerForSubmission, isMountedRef, sessionId, questions.length]);
 
+  // Stable callbacks
   const handleTimeUp = useCallback(async () => {
     console.log('ExamSubmissionHandler: Time up triggered');
     await performSubmission('time up');
@@ -86,14 +87,15 @@ export const useExamSubmissionHandler = ({
     await performSubmission('manual submit');
   }, [performSubmission]);
 
-  // Sync submission states - only when actually different
+  // Only sync submission states when actually different - prevent unnecessary updates
   useEffect(() => {
     if (isMountedRef.current && isSubmitting !== submissionInProgress) {
+      console.log('ExamSubmissionHandler: Syncing submission state:', submissionInProgress);
       setIsSubmitting(submissionInProgress);
     }
   }, [submissionInProgress, setIsSubmitting, isMountedRef, isSubmitting]);
 
-  // Cleanup effect
+  // Cleanup effect - only run on unmount
   useEffect(() => {
     return () => {
       console.log('ExamSubmissionHandler: Component unmounting, cleaning up timers');

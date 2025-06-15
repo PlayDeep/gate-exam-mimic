@@ -32,11 +32,24 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     isMountedRef
   } = containerState;
 
-  // Memoize handler props to prevent constant re-creation
+  // Stable handler props - prevent re-creation on every render
   const handlerProps = useMemo(() => ({
     ...containerState,
     subject
-  }), [containerState, subject]);
+  }), [
+    // Only depend on actual changing values, not the entire containerState object
+    containerState.sessionId,
+    containerState.questions,
+    containerState.timeLeft,
+    containerState.currentQuestion,
+    containerState.answers,
+    containerState.markedForReview,
+    containerState.isFullscreen,
+    containerState.isLoading,
+    containerState.isSubmitting,
+    containerState.totalQuestions,
+    subject
+  ]);
 
   const handlers = useExamHandlers(handlerProps);
 

@@ -58,7 +58,7 @@ export const useExamHandlers = (props: UseExamHandlersProps) => {
     isMountedRef
   } = props;
 
-  // Memoize submission handler props to prevent re-creation
+  // Stable submission handler props - prevent re-creation on every render
   const submissionHandlerProps = useMemo(() => ({
     sessionId,
     questions,
@@ -90,14 +90,18 @@ export const useExamHandlers = (props: UseExamHandlersProps) => {
     onTimeUp: handleTimeUp
   });
 
-  const { handleAnswerChange } = useExamAnswerHandler({
+  // Stable answer handler props
+  const answerHandlerProps = useMemo(() => ({
     sessionId,
     questions,
     updateAnswer,
     getTimeSpent
-  });
+  }), [sessionId, questions, updateAnswer, getTimeSpent]);
 
-  const { handleQuestionNavigation, handleNext, handlePrevious } = useExamNavigationHandler({
+  const { handleAnswerChange } = useExamAnswerHandler(answerHandlerProps);
+
+  // Stable navigation handler props
+  const navigationHandlerProps = useMemo(() => ({
     currentQuestion,
     totalQuestions,
     isLoading,
@@ -105,26 +109,33 @@ export const useExamHandlers = (props: UseExamHandlersProps) => {
     navigateToQuestion,
     nextQuestion,
     previousQuestion
-  });
+  }), [currentQuestion, totalQuestions, isLoading, submissionInProgress, navigateToQuestion, nextQuestion, previousQuestion]);
+
+  const { handleQuestionNavigation, handleNext, handlePrevious } = useExamNavigationHandler(navigationHandlerProps);
 
   const { toggleFullscreen } = useExamFullscreen({ setIsFullscreen });
 
-  const confirmationHandlers = useExamConfirmationHandlers({
+  // Stable confirmation handler props
+  const confirmationHandlerProps = useMemo(() => ({
     currentQuestion,
     clearAnswer,
     toggleMarkForReview,
     handleSubmit
-  });
+  }), [currentQuestion, clearAnswer, toggleMarkForReview, handleSubmit]);
 
-  // Time warnings hook
-  useTimeWarnings({
+  const confirmationHandlers = useExamConfirmationHandlers(confirmationHandlerProps);
+
+  // Time warnings hook - stable props
+  const timeWarningsProps = useMemo(() => ({
     timeLeft,
     isLoading,
     isSubmitting: submissionInProgress
-  });
+  }), [timeLeft, isLoading, submissionInProgress]);
 
-  // Keyboard navigation hook
-  useKeyboardNavigation({
+  useTimeWarnings(timeWarningsProps);
+
+  // Keyboard navigation hook - stable props
+  const keyboardNavProps = useMemo(() => ({
     currentQuestion,
     totalQuestions,
     isLoading,
@@ -133,7 +144,9 @@ export const useExamHandlers = (props: UseExamHandlersProps) => {
     onPrevious: handlePrevious,
     onMarkForReview: confirmationHandlers.handleMarkForReview,
     onClearResponse: confirmationHandlers.handleClearResponse
-  });
+  }), [currentQuestion, totalQuestions, isLoading, submissionInProgress, handleNext, handlePrevious, confirmationHandlers.handleMarkForReview, confirmationHandlers.handleClearResponse]);
+
+  useKeyboardNavigation(keyboardNavProps);
 
   return {
     formattedTime,
