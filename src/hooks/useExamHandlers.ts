@@ -1,4 +1,5 @@
 
+import { useMemo } from "react";
 import { useExamTimer } from "@/hooks/useExamTimer";
 import { useExamAnswerHandler } from "@/hooks/useExamAnswerHandler";
 import { useExamNavigationHandler } from "@/hooks/useExamNavigationHandler";
@@ -57,12 +58,8 @@ export const useExamHandlers = (props: UseExamHandlersProps) => {
     isMountedRef
   } = props;
 
-  const {
-    handleTimeUp,
-    handleSubmit,
-    getTimeSpent,
-    submissionInProgress
-  } = useExamSubmissionHandler({
+  // Memoize submission handler props to prevent re-creation
+  const submissionHandlerProps = useMemo(() => ({
     sessionId,
     questions,
     answers,
@@ -72,7 +69,16 @@ export const useExamHandlers = (props: UseExamHandlersProps) => {
     isLoading,
     isSubmitting,
     setIsSubmitting,
-    isMountedRef,
+    isMountedRef
+  }), [sessionId, questions, answers, timeLeft, subject, currentQuestion, isLoading, isSubmitting, setIsSubmitting, isMountedRef]);
+
+  const {
+    handleTimeUp,
+    handleSubmit,
+    getTimeSpent,
+    submissionInProgress
+  } = useExamSubmissionHandler({
+    ...submissionHandlerProps,
     stopTimerForSubmission: () => {} // Will be set by timer
   });
 

@@ -1,4 +1,5 @@
 
+import { useMemo } from "react";
 import { useExamContainerState } from "@/hooks/useExamContainerState";
 import { useExamHandlers } from "@/hooks/useExamHandlers";
 import ExamLoadingState from "./ExamLoadingState";
@@ -31,10 +32,13 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     isMountedRef
   } = containerState;
 
-  const handlers = useExamHandlers({
+  // Memoize handler props to prevent constant re-creation
+  const handlerProps = useMemo(() => ({
     ...containerState,
     subject
-  });
+  }), [containerState, subject]);
+
+  const handlers = useExamHandlers(handlerProps);
 
   // Loading state
   if (isLoading || questions.length === 0) {
@@ -44,16 +48,6 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   const answeredCount = Object.keys(answers).length;
   const markedCount = markedForReview.size;
   const currentQuestionData = questions[currentQuestion - 1];
-
-  console.log('ExamContainer: Rendering with state:', {
-    currentQuestion,
-    totalQuestions,
-    answeredCount,
-    markedCount,
-    submissionInProgress: handlers.submissionInProgress,
-    timeLeft,
-    sessionId
-  });
 
   return (
     <>

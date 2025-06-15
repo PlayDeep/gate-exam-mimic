@@ -1,4 +1,5 @@
 
+import { useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Question } from "@/services/questionService";
@@ -16,34 +17,27 @@ const QuestionContent = ({
   answer,
   onAnswerChange
 }: QuestionContentProps) => {
-  // Helper function to parse options correctly
-  const parseOptions = (options: any): Array<{id: string, text: string, image?: string}> => {
-    if (!options) return [];
-    
-    console.log('Parsing options:', options, 'Type:', typeof options);
+  // Memoize the parsed options to prevent re-parsing on every render
+  const parsedOptions = useMemo(() => {
+    if (!question.options) return [];
     
     // If it's already an array of objects with id and text
-    if (Array.isArray(options) && options.length > 0 && typeof options[0] === 'object' && 'id' in options[0]) {
-      console.log('Options are already in correct format');
-      return options as Array<{id: string, text: string, image?: string}>;
+    if (Array.isArray(question.options) && question.options.length > 0 && typeof question.options[0] === 'object' && 'id' in question.options[0]) {
+      return question.options as Array<{id: string, text: string, image?: string}>;
     }
     
     // If it's an array of strings, convert to objects
-    if (Array.isArray(options)) {
-      console.log('Converting string array to options format');
-      const converted = options.map((option, index) => ({
+    if (Array.isArray(question.options)) {
+      return question.options.map((option, index) => ({
         id: String.fromCharCode(65 + index), // A, B, C, D
         text: String(option),
         image: undefined
       }));
-      console.log('Converted options:', converted);
-      return converted;
     }
     
     // If it's an object, convert to array (new format with image support)
-    if (typeof options === 'object') {
-      console.log('Converting object to options format');
-      const converted = Object.entries(options).map(([key, value]) => {
+    if (typeof question.options === 'object') {
+      return Object.entries(question.options).map(([key, value]) => {
         // Handle new format with text and image
         if (typeof value === 'object' && value !== null && 'text' in value) {
           const optionValue = value as { text: unknown; image?: string };
@@ -60,13 +54,10 @@ const QuestionContent = ({
           image: undefined
         };
       });
-      console.log('Converted options:', converted);
-      return converted;
     }
     
-    console.log('Could not parse options, returning empty array');
     return [];
-  };
+  }, [question.options]);
 
   // Helper function to check if image URL is valid and not a placeholder
   const isValidImageUrl = (url: string | undefined): boolean => {
@@ -131,7 +122,7 @@ const QuestionContent = ({
                 {/* Options for MCQ */}
                 {question.question_type === 'MCQ' && question.options && (
                   <div className="space-y-3">
-                    {parseOptions(question.options).map(option => (
+                    {parsedOptions.map(option => (
                       <div
                         key={option.id}
                         className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer"
