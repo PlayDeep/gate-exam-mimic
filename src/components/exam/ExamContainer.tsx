@@ -46,14 +46,6 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     initialSessionId
   });
 
-  const { formattedTime, stopTimerForSubmission } = useExamTimer({
-    timeLeft,
-    setTimeLeft,
-    isLoading: isLoading || questions.length === 0,
-    sessionId,
-    onTimeUp: () => {} // Will be set by submission handler
-  });
-
   const {
     handleTimeUp,
     handleSubmit,
@@ -70,11 +62,10 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     isSubmitting,
     setIsSubmitting,
     isMountedRef,
-    stopTimerForSubmission
+    stopTimerForSubmission: () => {} // Will be set by timer
   });
 
-  // Update timer's onTimeUp to use submission handler
-  const { formattedTime: finalFormattedTime } = useExamTimer({
+  const { formattedTime, stopTimerForSubmission } = useExamTimer({
     timeLeft,
     setTimeLeft,
     isLoading: isLoading || questions.length === 0,
@@ -82,18 +73,38 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     onTimeUp: handleTimeUp
   });
 
+  // Update the submission handler with the stop timer function
+  const {
+    handleTimeUp: finalHandleTimeUp,
+    handleSubmit: finalHandleSubmit,
+    getTimeSpent: finalGetTimeSpent,
+    submissionInProgress: finalSubmissionInProgress
+  } = useExamSubmissionHandler({
+    sessionId,
+    questions,
+    answers,
+    timeLeft,
+    subject,
+    currentQuestion,
+    isLoading,
+    isSubmitting,
+    setIsSubmitting,
+    isMountedRef,
+    stopTimerForSubmission
+  });
+
   const { handleAnswerChange } = useExamAnswerHandler({
     sessionId,
     questions,
     updateAnswer,
-    getTimeSpent
+    getTimeSpent: finalGetTimeSpent
   });
 
   const { handleQuestionNavigation, handleNext, handlePrevious } = useExamNavigationHandler({
     currentQuestion,
     totalQuestions,
     isLoading,
-    isSubmitting: submissionInProgress,
+    isSubmitting: finalSubmissionInProgress,
     navigateToQuestion,
     nextQuestion,
     previousQuestion
@@ -113,6 +124,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   };
 
   const handleSubmitExam = () => {
+    console.log('ExamContainer: Submit exam button clicked');
     showDialog('submitExam');
   };
 
@@ -120,7 +132,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   useTimeWarnings({
     timeLeft,
     isLoading,
-    isSubmitting: submissionInProgress
+    isSubmitting: finalSubmissionInProgress
   });
 
   // Keyboard navigation hook
@@ -128,7 +140,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     currentQuestion,
     totalQuestions,
     isLoading,
-    isSubmitting: submissionInProgress,
+    isSubmitting: finalSubmissionInProgress,
     onNext: handleNext,
     onPrevious: handlePrevious,
     onMarkForReview: handleMarkForReview,
@@ -141,8 +153,9 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   };
 
   const confirmSubmitExam = () => {
+    console.log('ExamContainer: Confirmed submit exam');
     hideDialog('submitExam');
-    handleSubmit();
+    finalHandleSubmit();
   };
 
   // Loading state
@@ -159,8 +172,9 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     totalQuestions,
     answeredCount,
     markedCount,
-    submissionInProgress,
-    timeLeft
+    submissionInProgress: finalSubmissionInProgress,
+    timeLeft,
+    sessionId
   });
 
   return (
@@ -173,7 +187,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
         onSubmitExam={handleSubmitExam}
-        submissionInProgress={submissionInProgress}
+        submissionInProgress={finalSubmissionInProgress}
         currentQuestionData={currentQuestionData}
         answers={answers}
         isLoading={isLoading}

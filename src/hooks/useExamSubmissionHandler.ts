@@ -32,6 +32,15 @@ export const useExamSubmissionHandler = ({
   stopTimerForSubmission
 }: UseExamSubmissionHandlerProps) => {
   
+  console.log('ExamSubmissionHandler: Initializing with:', {
+    sessionId,
+    questionsCount: questions.length,
+    answersCount: Object.keys(answers).length,
+    timeLeft,
+    subject,
+    isSubmitting
+  });
+
   const { getTimeSpent, getAllTimeData, cleanupTimers } = useExamTimerManager({
     currentQuestion,
     isLoading,
@@ -51,12 +60,25 @@ export const useExamSubmissionHandler = ({
 
   // Sync submission states
   useEffect(() => {
-    console.log('ExamSubmissionHandler: Syncing submission state:', submissionInProgress);
-    setIsSubmitting(submissionInProgress);
-  }, [submissionInProgress, setIsSubmitting]);
+    console.log('ExamSubmissionHandler: Syncing submission state:', {
+      submissionInProgress,
+      isSubmitting,
+      mounted: isMountedRef.current
+    });
+    if (isMountedRef.current) {
+      setIsSubmitting(submissionInProgress);
+    }
+  }, [submissionInProgress, setIsSubmitting, isMountedRef]);
 
   const performSubmission = useCallback(async (source: string) => {
     console.log(`ExamSubmissionHandler: Starting submission from ${source}`);
+    console.log('Current state:', {
+      mounted: isMountedRef.current,
+      submissionInProgress,
+      sessionId,
+      questionsLength: questions.length,
+      answersCount: Object.keys(answers).length
+    });
     
     if (!isMountedRef.current) {
       console.log('ExamSubmissionHandler: Component not mounted, aborting');
@@ -65,6 +87,16 @@ export const useExamSubmissionHandler = ({
     
     if (submissionInProgress) {
       console.log('ExamSubmissionHandler: Submission already in progress, aborting');
+      return;
+    }
+
+    if (!sessionId) {
+      console.error('ExamSubmissionHandler: No session ID available');
+      return;
+    }
+
+    if (questions.length === 0) {
+      console.error('ExamSubmissionHandler: No questions available');
       return;
     }
     
@@ -82,7 +114,7 @@ export const useExamSubmissionHandler = ({
     } catch (error) {
       console.error(`ExamSubmissionHandler: ${source} submission failed:`, error);
     }
-  }, [submitExam, submissionInProgress, cleanupTimers, stopTimerForSubmission, isMountedRef]);
+  }, [submitExam, submissionInProgress, cleanupTimers, stopTimerForSubmission, isMountedRef, sessionId, questions.length, answers]);
 
   const handleTimeUp = useCallback(async () => {
     console.log('ExamSubmissionHandler: Time up triggered');
@@ -91,24 +123,27 @@ export const useExamSubmissionHandler = ({
 
   const handleSubmit = useCallback(async () => {
     console.log('ExamSubmissionHandler: Submit button clicked');
-    console.log('Component mounted:', isMountedRef.current);
-    console.log('Session ID:', sessionId);
-    console.log('Questions count:', questions.length);
-    console.log('Submission in progress:', submissionInProgress);
+    console.log('Component state:', {
+      mounted: isMountedRef.current,
+      sessionId: !!sessionId,
+      questionsCount: questions.length,
+      submissionInProgress,
+      timeLeft
+    });
     
     // Enhanced validation
     if (!isMountedRef.current) {
-      console.log('ExamSubmissionHandler: Component not mounted');
+      console.error('ExamSubmissionHandler: Component not mounted');
       return;
     }
 
     if (!sessionId || questions.length === 0) {
-      console.log('ExamSubmissionHandler: Invalid state - sessionId:', !!sessionId, 'questions:', questions.length);
+      console.error('ExamSubmissionHandler: Invalid state - sessionId:', !!sessionId, 'questions:', questions.length);
       return;
     }
 
     await performSubmission('manual submit');
-  }, [sessionId, questions.length, performSubmission, submissionInProgress, isMountedRef]);
+  }, [sessionId, questions.length, performSubmission, submissionInProgress, isMountedRef, timeLeft]);
 
   // Cleanup effect
   useEffect(() => {
