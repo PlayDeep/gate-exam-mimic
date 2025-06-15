@@ -1,3 +1,4 @@
+
 import { Trophy, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -114,30 +115,38 @@ const ScoreOverview = ({
         <CardContent>
           <div className="space-y-6">
             {/* Time Chart */}
-            <div className="h-64 w-full">
+            <div className="w-full">
               <h4 className="font-medium text-gray-800 mb-3">Time per Question</h4>
-              <ChartContainer config={chartConfig}>
-                <BarChart data={chartData}>
-                  <XAxis 
-                    dataKey="question" 
-                    tick={{ fontSize: 10 }}
-                    interval={Math.max(1, Math.floor(totalQuestions / 10))}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 10 }}
-                    label={{ value: 'Time (s)', angle: -90, position: 'insideLeft' }}
-                  />
-                  <ChartTooltip 
-                    content={<ChartTooltipContent />}
-                    formatter={(value: any) => [`${value}s`, "Time Spent"]}
-                  />
-                  <Bar 
-                    dataKey="timeSpent" 
-                    fill="var(--color-timeSpent)"
-                    radius={[2, 2, 0, 0]}
-                  />
-                </BarChart>
-              </ChartContainer>
+              <div className="h-80 w-full">
+                <ChartContainer config={chartConfig}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <XAxis 
+                        dataKey="question" 
+                        tick={{ fontSize: 12 }}
+                        interval={Math.max(0, Math.floor(totalQuestions / 15))}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis 
+                        tick={{ fontSize: 12 }}
+                        label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft' }}
+                        width={60}
+                      />
+                      <ChartTooltip 
+                        content={<ChartTooltipContent />}
+                        formatter={(value: any) => [`${value}s`, "Time Spent"]}
+                      />
+                      <Bar 
+                        dataKey="timeSpent" 
+                        fill="var(--color-timeSpent)"
+                        radius={[2, 2, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+              </div>
             </div>
 
             {/* Summary Statistics */}
