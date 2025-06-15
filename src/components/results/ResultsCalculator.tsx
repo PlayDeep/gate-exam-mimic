@@ -1,4 +1,6 @@
 
+import { useMemo } from 'react';
+
 export interface ResultsData {
   score: number;
   correctAnswers: number;
@@ -23,7 +25,7 @@ export const useResultsCalculator = ({
   passedPercentage 
 }: ResultsCalculatorProps): ResultsData => {
   
-  const calculateResults = (): ResultsData => {
+  const results = useMemo(() => {
     console.log('=== RESULTS CALCULATOR START ===');
     console.log('Input questions:', questions.length);
     console.log('Input answers:', Object.keys(answers || {}).length);
@@ -153,7 +155,7 @@ export const useResultsCalculator = ({
     console.log('Final result:', result);
 
     return result;
-  };
+  }, [questions, answers, passedScore, passedPercentage]); // Memoize with dependencies
 
-  return calculateResults();
+  return results;
 };
