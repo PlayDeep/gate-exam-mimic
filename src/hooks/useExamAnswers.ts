@@ -25,7 +25,7 @@ export const useExamAnswers = ({
   const { getTimeSpent } = useQuestionTimer();
   const { trackAnswerUpdate } = useRealTimeTracking({ 
     sessionId, 
-    isActive: !isLoading && sessionId !== '' 
+    isActive: !isLoading && sessionId !== '' && questions.length > 0
   });
 
   const handleAnswerChange = async (questionId: number, answer: string) => {
@@ -36,8 +36,10 @@ export const useExamAnswers = ({
     
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     
-    // Track answer update in real-time
-    trackAnswerUpdate(questionId, answer);
+    // Track answer update in real-time - only if we have a valid session
+    if (sessionId && questions.length > 0) {
+      trackAnswerUpdate(questionId, answer);
+    }
     
     // Save answer to database with actual time spent
     if (sessionId && questions[questionId - 1]) {

@@ -27,7 +27,7 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
   const connectionFailedRef = useRef<boolean>(false);
 
   useEffect(() => {
-    // Prevent multiple initializations
+    // Prevent multiple initializations or if connection previously failed
     if (!sessionId || !isActive || isInitializedRef.current || connectionFailedRef.current) {
       return;
     }
@@ -35,7 +35,7 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
     console.log('Initializing real-time tracking for session:', sessionId);
     isInitializedRef.current = true;
 
-    // Start session tracking
+    // Start session tracking - non-blocking
     trackActivity(sessionId, 'session_start').catch(error => {
       console.warn('Failed to track session start:', error);
     });
@@ -43,7 +43,7 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
     // Start heartbeat
     heartbeatIntervalRef.current = startHeartbeat(sessionId);
 
-    // Set up real-time channel for monitoring - create new channel instance
+    // Set up real-time channel for monitoring
     const channelName = `test_session_${sessionId}`;
     console.log('Creating channel:', channelName);
     
@@ -90,7 +90,9 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
           connectionFailedRef.current = true;
           // Don't throw error, just log it - allow exam to continue
         }
-        if (status === 'SUBSCRIPTION_ERROR' || status === 'CLOSED') {
+        
+        // Check for failed connection states
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           console.warn('Realtime connection failed, continuing without real-time features');
           connectionFailedRef.current = true;
         }
@@ -106,7 +108,7 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
       console.log('Cleaning up real-time tracking...');
       isInitializedRef.current = false;
       
-      // Track session end
+      // Track session end - non-blocking
       if (sessionId) {
         trackActivity(sessionId, 'session_end').catch(error => {
           console.warn('Failed to track session end:', error);
@@ -158,7 +160,7 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
   }, []);
 
   const trackQuestionChange = (questionNumber: number) => {
-    if (sessionId && isActive && isInitializedRef.current) {
+    if (sessionId && isActive && isInitializedRef.current && !connectionFailedRef.current) {
       trackActivity(sessionId, 'question_change', questionNumber).catch(error => {
         console.warn('Failed to track question change:', error);
       });
@@ -166,7 +168,7 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
   };
 
   const trackAnswerUpdate = (questionNumber: number, answer: string) => {
-    if (sessionId && isActive && isInitializedRef.current) {
+    if (sessionId && isActive && isInitializedRef.current && !connectionFailedRef.current) {
       trackActivity(sessionId, 'answer_update', questionNumber, { answer }).catch(error => {
         console.warn('Failed to track answer update:', error);
       });

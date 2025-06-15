@@ -51,9 +51,11 @@ export const useExamLogic = ({
 }: UseExamLogicProps) => {
   const { user, loading } = useAuth();
   const { startTimer, stopTimer, getTimeSpent } = useQuestionTimer();
+  
+  // Only initialize real-time tracking when we have a valid session and exam is loaded
   const { trackQuestionChange } = useRealTimeTracking({ 
     sessionId, 
-    isActive: !isLoading && sessionId !== '' 
+    isActive: !isLoading && sessionId !== '' && totalQuestions > 0 
   });
 
   // Initialize exam (authentication, questions loading, session creation)
@@ -100,16 +102,20 @@ export const useExamLogic = ({
 
   // Start timer for first question when exam loads and handle question changes
   useEffect(() => {
-    if (!isLoading && totalQuestions > 0) {
+    if (!isLoading && totalQuestions > 0 && currentQuestion > 0) {
       console.log('Starting timer for question:', currentQuestion);
       startTimer(currentQuestion);
-      trackQuestionChange(currentQuestion);
+      
+      // Only track question changes if we have a valid session
+      if (sessionId) {
+        trackQuestionChange(currentQuestion);
+      }
     }
-  }, [currentQuestion, isLoading, totalQuestions, startTimer, trackQuestionChange]);
+  }, [currentQuestion, isLoading, totalQuestions, startTimer, trackQuestionChange, sessionId]);
 
   // Timer effect
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !sessionId) return;
     
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -122,7 +128,7 @@ export const useExamLogic = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isLoading, setTimeLeft, handleSubmitExam]);
+  }, [isLoading, sessionId, setTimeLeft, handleSubmitExam]);
 
   // Fullscreen effect
   useEffect(() => {
