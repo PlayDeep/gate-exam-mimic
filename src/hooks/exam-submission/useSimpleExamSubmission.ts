@@ -29,6 +29,7 @@ export const useSimpleExamSubmission = ({
   const { toast } = useToast();
   const isMountedRef = useRef(true);
   const hasSubmittedRef = useRef(false);
+  const submissionLockRef = useRef(false);
 
   const { validateSubmissionState } = useSubmissionValidation();
   const { calculateResults } = useResultsCalculation();
@@ -46,57 +47,69 @@ export const useSimpleExamSubmission = ({
     console.log('Component mounted:', isMountedRef.current);
     console.log('Has submitted:', hasSubmittedRef.current);
     console.log('Is submitting:', isSubmitting);
+    console.log('Submission lock:', submissionLockRef.current);
     
+    // Immediate lock to prevent concurrent submissions
+    if (submissionLockRef.current) {
+      console.log('Submission locked, aborting');
+      return;
+    }
+    submissionLockRef.current = true;
+
     // Check if component is still mounted
     if (!isMountedRef.current) {
       console.log('Component unmounted, aborting submission');
+      submissionLockRef.current = false;
       return;
     }
 
     // Check if already submitted
     if (hasSubmittedRef.current) {
       console.log('Already submitted, aborting');
+      submissionLockRef.current = false;
       return;
     }
 
     // Check if submission is already in progress
     if (isSubmitting) {
       console.log('Submission already in progress, aborting');
+      submissionLockRef.current = false;
       return;
-    }
-
-    // Mark as submitted immediately to prevent multiple calls
-    hasSubmittedRef.current = true;
-    
-    // Validate submission state
-    const validation = validateSubmissionState({
-      sessionId,
-      questions,
-      answers,
-      timeLeft,
-      isSubmitting
-    });
-    
-    if (!validation.isValid) {
-      console.error('Submission blocked:', validation.error);
-      hasSubmittedRef.current = false;
-      
-      if (isMountedRef.current) {
-        toast({
-          title: "Submission Error",
-          description: validation.error || "Invalid state for submission",
-          variant: "destructive",
-        });
-      }
-      return;
-    }
-
-    console.log('Setting isSubmitting to true');
-    if (isMountedRef.current) {
-      setIsSubmitting(true);
     }
 
     try {
+      // Mark as submitted immediately to prevent multiple calls
+      hasSubmittedRef.current = true;
+      
+      // Validate submission state
+      const validation = validateSubmissionState({
+        sessionId,
+        questions,
+        answers,
+        timeLeft,
+        isSubmitting
+      });
+      
+      if (!validation.isValid) {
+        console.error('Submission blocked:', validation.error);
+        hasSubmittedRef.current = false;
+        submissionLockRef.current = false;
+        
+        if (isMountedRef.current) {
+          toast({
+            title: "Submission Error",
+            description: validation.error || "Invalid state for submission",
+            variant: "destructive",
+          });
+        }
+        return;
+      }
+
+      console.log('Setting isSubmitting to true');
+      if (isMountedRef.current) {
+        setIsSubmitting(true);
+      }
+
       // Calculate results
       console.log('Calculating results...');
       const results = calculateResults({ questions, answers, timeLeft });
@@ -163,6 +176,7 @@ export const useSimpleExamSubmission = ({
       
       // Reset submission state on error
       hasSubmittedRef.current = false;
+      submissionLockRef.current = false;
       
       if (isMountedRef.current) {
         setIsSubmitting(false);

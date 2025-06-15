@@ -42,6 +42,14 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     initialSessionId
   });
 
+  const { formattedTime, stopTimerForSubmission } = useExamTimer({
+    timeLeft,
+    setTimeLeft,
+    isLoading: isLoading || questions.length === 0,
+    sessionId,
+    onTimeUp: () => {} // Will be set by submission handler
+  });
+
   const {
     handleTimeUp,
     handleSubmit,
@@ -57,10 +65,12 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     isLoading,
     isSubmitting,
     setIsSubmitting,
-    isMountedRef
+    isMountedRef,
+    stopTimerForSubmission
   });
 
-  const { formattedTime } = useExamTimer({
+  // Update timer's onTimeUp to use submission handler
+  const { formattedTime: finalFormattedTime } = useExamTimer({
     timeLeft,
     setTimeLeft,
     isLoading: isLoading || questions.length === 0,

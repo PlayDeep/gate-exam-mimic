@@ -20,6 +20,7 @@ export const useExamTimer = ({
   const hasCalledTimeUpRef = useRef(false);
   const isMountedRef = useRef(true);
   const isTimerActiveRef = useRef(false);
+  const isSubmittingRef = useRef(false);
 
   // Keep onTimeUp reference current
   useEffect(() => {
@@ -35,9 +36,18 @@ export const useExamTimer = ({
   }, []);
 
   const handleTimeUp = useCallback(() => {
-    if (!hasCalledTimeUpRef.current && isMountedRef.current) {
+    if (!hasCalledTimeUpRef.current && isMountedRef.current && !isSubmittingRef.current) {
       console.log('Timer: Time is up, calling onTimeUp callback');
       hasCalledTimeUpRef.current = true;
+      isSubmittingRef.current = true;
+      
+      // Clean up timer immediately
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+        isTimerActiveRef.current = false;
+      }
+      
       onTimeUpRef.current();
     }
   }, []);
@@ -51,10 +61,16 @@ export const useExamTimer = ({
     }
   }, []);
 
+  const stopTimerForSubmission = useCallback(() => {
+    console.log('Timer: Stopping timer for submission');
+    isSubmittingRef.current = true;
+    cleanupTimer();
+  }, [cleanupTimer]);
+
   const startTimer = useCallback(() => {
-    // Prevent multiple timers
-    if (isTimerActiveRef.current) {
-      console.log('Timer: Already active, skipping start');
+    // Prevent multiple timers or starting during submission
+    if (isTimerActiveRef.current || isSubmittingRef.current) {
+      console.log('Timer: Already active or submitting, skipping start');
       return;
     }
 
@@ -62,14 +78,14 @@ export const useExamTimer = ({
     isTimerActiveRef.current = true;
     
     timerRef.current = setInterval(() => {
-      if (!isMountedRef.current) {
+      if (!isMountedRef.current || isSubmittingRef.current) {
         cleanupTimer();
         return;
       }
       
       setTimeLeft((prev) => {
         const newTime = Math.max(0, prev - 1);
-        if (newTime <= 0 && !hasCalledTimeUpRef.current) {
+        if (newTime <= 0 && !hasCalledTimeUpRef.current && !isSubmittingRef.current) {
           console.log('Timer: Time reached 0, triggering time up');
           setTimeout(() => handleTimeUp(), 0);
         }
@@ -86,11 +102,12 @@ export const useExamTimer = ({
     // Reset time up flag when starting new session
     if (sessionId) {
       hasCalledTimeUpRef.current = false;
+      isSubmittingRef.current = false;
     }
     
-    // Don't start timer if loading, no session, already called time up, or time is up
-    if (isLoading || !sessionId || timeLeft <= 0 || hasCalledTimeUpRef.current) {
-      console.log('Timer: Not starting - isLoading:', isLoading, 'sessionId:', !!sessionId, 'timeLeft:', timeLeft, 'hasCalledTimeUp:', hasCalledTimeUpRef.current);
+    // Don't start timer if loading, no session, already called time up, time is up, or submitting
+    if (isLoading || !sessionId || timeLeft <= 0 || hasCalledTimeUpRef.current || isSubmittingRef.current) {
+      console.log('Timer: Not starting - isLoading:', isLoading, 'sessionId:', !!sessionId, 'timeLeft:', timeLeft, 'hasCalledTimeUp:', hasCalledTimeUpRef.current, 'isSubmitting:', isSubmittingRef.current);
       return;
     }
     
@@ -112,6 +129,7 @@ export const useExamTimer = ({
   };
 
   return {
-    formattedTime: formatTime(timeLeft)
+    formattedTime: formatTime(timeLeft),
+    stopTimerForSubmission
   };
 };
