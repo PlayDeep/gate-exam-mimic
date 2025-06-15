@@ -68,7 +68,7 @@ export const useResultsCalculator = ({
       
       // Normalize answers for comparison - consistent with submission logic
       const normalizedUserAnswer = userAnswer !== undefined && userAnswer !== '' ? String(userAnswer).trim() : '';
-      const normalizedCorrectAnswer = String(question.correct_answer || question.correctAnswer || '').trim();
+      const normalizedCorrectAnswer = String(question.correct_answer || '').trim();
       
       // Get question properties with enhanced defaults
       const marks = typeof question.marks === 'number' ? question.marks : 1;
@@ -155,7 +155,7 @@ export const useResultsCalculator = ({
     console.log('Final result:', result);
 
     return result;
-  }, [questions, answers, passedScore, passedPercentage]); // Fixed: Added back all dependencies for proper memoization
+  }, [questions, answers, passedScore, passedPercentage]);
 
   return results;
 };

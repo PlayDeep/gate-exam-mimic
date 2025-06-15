@@ -78,7 +78,7 @@ export const useResultsData = () => {
         const hasValidQuestions = questions.every(q => 
           q && 
           typeof q === 'object' && 
-          (q.correct_answer !== undefined || q.correctAnswer !== undefined)
+          (q.correct_answer !== undefined)
         );
 
         if (!hasValidQuestions) {
@@ -139,7 +139,7 @@ export const useResultsData = () => {
     };
 
     loadResultsData();
-  }, [location.state]); // Fixed: Added location.state as dependency
+  }, [location.state]);
 
   return { resultsData, isLoading, error };
 };

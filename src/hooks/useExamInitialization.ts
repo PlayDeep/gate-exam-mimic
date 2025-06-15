@@ -34,7 +34,7 @@ export const useExamInitialization = () => {
   // Initialize exam - only run once when conditions are met
   useEffect(() => {
     const initializeExam = async () => {
-      // Fixed: Changed from confusing !loading === false to proper loading check
+      // Check if we should initialize
       if (!subject || !user || loading || sessionId || isInitialized) {
         return;
       }
@@ -68,7 +68,7 @@ export const useExamInitialization = () => {
         
       } catch (error) {
         console.error('useExamInitialization: Error during initialization:', error);
-        setIsInitialized(false); // Reset on error
+        setIsInitialized(false); // Reset on error to allow retry
         toast({
           title: "Initialization Error",
           description: error instanceof Error ? error.message : "Failed to load test questions.",

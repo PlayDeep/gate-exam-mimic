@@ -14,8 +14,8 @@ interface UseSimpleExamSubmissionProps {
   questionTimeData?: Array<{ questionNumber: number; timeSpent: number }>;
 }
 
-// Made exam duration configurable - can be moved to environment variables later
-const EXAM_DURATION_MINUTES = 180; // 3 hours - configurable
+// Configurable exam duration - can be moved to environment variables later
+const EXAM_DURATION_MINUTES = 180; // 3 hours
 
 export const useSimpleExamSubmission = ({
   sessionId,
