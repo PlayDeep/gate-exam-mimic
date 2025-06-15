@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -143,18 +144,39 @@ const PreviousTests = () => {
 
   const handleDeleteTest = async (testId: string) => {
     try {
-      const { error } = await supabase
+      console.log('Deleting test session:', testId);
+      
+      // First delete related user_answers
+      const { error: answersError } = await supabase
+        .from('user_answers')
+        .delete()
+        .eq('session_id', testId);
+
+      if (answersError) {
+        console.error('Error deleting user answers:', answersError);
+        throw answersError;
+      }
+
+      // Then delete the test session
+      const { error: sessionError } = await supabase
         .from('test_sessions')
         .delete()
         .eq('id', testId);
 
-      if (error) throw error;
+      if (sessionError) {
+        console.error('Error deleting test session:', sessionError);
+        throw sessionError;
+      }
 
+      // Update local state only after successful deletion
       setTests(prev => prev.filter(test => test.id !== testId));
+      
       toast({
         title: "Success",
         description: "Test deleted successfully.",
       });
+      
+      console.log('Test session deleted successfully');
     } catch (error) {
       console.error('Error deleting test:', error);
       toast({

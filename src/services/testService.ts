@@ -137,3 +137,27 @@ export const getTestSessionDetails = async (sessionId: string) => {
 
   return { session, answers: answers || [] };
 };
+
+export const deleteTestSession = async (sessionId: string): Promise<void> => {
+  // First delete related user_answers
+  const { error: answersError } = await supabase
+    .from('user_answers')
+    .delete()
+    .eq('session_id', sessionId);
+
+  if (answersError) {
+    console.error('Error deleting user answers:', answersError);
+    throw answersError;
+  }
+
+  // Then delete the test session
+  const { error: sessionError } = await supabase
+    .from('test_sessions')
+    .delete()
+    .eq('id', sessionId);
+
+  if (sessionError) {
+    console.error('Error deleting test session:', sessionError);
+    throw sessionError;
+  }
+};
