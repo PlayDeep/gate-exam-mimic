@@ -24,10 +24,11 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const isInitializedRef = useRef<boolean>(false);
+  const connectionFailedRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Prevent multiple initializations
-    if (!sessionId || !isActive || isInitializedRef.current) {
+    if (!sessionId || !isActive || isInitializedRef.current || connectionFailedRef.current) {
       return;
     }
 
@@ -35,7 +36,9 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
     isInitializedRef.current = true;
 
     // Start session tracking
-    trackActivity(sessionId, 'session_start');
+    trackActivity(sessionId, 'session_start').catch(error => {
+      console.warn('Failed to track session start:', error);
+    });
 
     // Start heartbeat
     heartbeatIntervalRef.current = startHeartbeat(sessionId);
@@ -44,44 +47,59 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
     const channelName = `test_session_${sessionId}`;
     console.log('Creating channel:', channelName);
     
-    channelRef.current = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'test_sessions',
-          filter: `id=eq.${sessionId}`
-        },
-        (payload: TestSessionPayload) => {
-          console.log('Test session change:', payload);
-          
-          // Check if session was force-submitted by admin
-          if (payload.new?.is_submitted && !payload.old?.is_submitted) {
-            console.log('Session was submitted by admin');
-            // Could show a notification or redirect user
+    try {
+      channelRef.current = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'test_sessions',
+            filter: `id=eq.${sessionId}`
+          },
+          (payload: TestSessionPayload) => {
+            console.log('Test session change:', payload);
+            
+            // Check if session was force-submitted by admin
+            if (payload.new?.is_submitted && !payload.old?.is_submitted) {
+              console.log('Session was submitted by admin');
+              // Could show a notification or redirect user
+            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'test_session_tracking',
-          filter: `session_id=eq.${sessionId}`
-        },
-        (payload) => {
-          console.log('New tracking activity:', payload);
-        }
-      );
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'test_session_tracking',
+            filter: `session_id=eq.${sessionId}`
+          },
+          (payload) => {
+            console.log('New tracking activity:', payload);
+          }
+        );
 
-    // Subscribe to the channel
-    console.log('Subscribing to channel...');
-    channelRef.current.subscribe((status) => {
-      console.log('Channel subscription status:', status);
-    });
+      // Subscribe to the channel with error handling
+      console.log('Subscribing to channel...');
+      channelRef.current.subscribe((status, error) => {
+        console.log('Channel subscription status:', status);
+        if (error) {
+          console.warn('Channel subscription error:', error);
+          connectionFailedRef.current = true;
+          // Don't throw error, just log it - allow exam to continue
+        }
+        if (status === 'SUBSCRIPTION_ERROR' || status === 'CLOSED') {
+          console.warn('Realtime connection failed, continuing without real-time features');
+          connectionFailedRef.current = true;
+        }
+      });
+    } catch (error) {
+      console.warn('Failed to set up real-time channel:', error);
+      connectionFailedRef.current = true;
+      // Continue without real-time features
+    }
 
     // Cleanup function
     return () => {
@@ -90,7 +108,9 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
       
       // Track session end
       if (sessionId) {
-        trackActivity(sessionId, 'session_end');
+        trackActivity(sessionId, 'session_end').catch(error => {
+          console.warn('Failed to track session end:', error);
+        });
       }
       
       // Stop heartbeat
@@ -101,9 +121,13 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
 
       // Unsubscribe from channel
       if (channelRef.current) {
-        console.log('Removing channel...');
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
+        try {
+          console.log('Removing channel...');
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        } catch (error) {
+          console.warn('Error removing channel:', error);
+        }
       }
     };
   }, [sessionId, isActive]);
@@ -122,22 +146,30 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
 
       // Unsubscribe from channel
       if (channelRef.current) {
-        console.log('Removing channel on unmount...');
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
+        try {
+          console.log('Removing channel on unmount...');
+          supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        } catch (error) {
+          console.warn('Error removing channel on unmount:', error);
+        }
       }
     };
   }, []);
 
   const trackQuestionChange = (questionNumber: number) => {
     if (sessionId && isActive && isInitializedRef.current) {
-      trackActivity(sessionId, 'question_change', questionNumber);
+      trackActivity(sessionId, 'question_change', questionNumber).catch(error => {
+        console.warn('Failed to track question change:', error);
+      });
     }
   };
 
   const trackAnswerUpdate = (questionNumber: number, answer: string) => {
     if (sessionId && isActive && isInitializedRef.current) {
-      trackActivity(sessionId, 'answer_update', questionNumber, { answer });
+      trackActivity(sessionId, 'answer_update', questionNumber, { answer }).catch(error => {
+        console.warn('Failed to track answer update:', error);
+      });
     }
   };
 
