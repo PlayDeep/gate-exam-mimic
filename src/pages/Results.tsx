@@ -14,6 +14,7 @@ interface ResultsData {
   answeredQuestions?: number;
   totalQuestions?: number;
   timeTaken?: number;
+  timeSpent?: number; // For backward compatibility
   answers: Record<number, string>;
   questions: any[];
   subject: string;
@@ -24,78 +25,118 @@ const Results = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [resultsData, setResultsData] = useState<ResultsData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Try to get data from location.state first (direct navigation from exam)
-    let data = location.state;
-    
-    // If no data in location.state, try sessionStorage (from useSimpleExamSubmission)
-    if (!data?.answers || !data?.questions) {
-      const storedData = sessionStorage.getItem('examResults');
-      if (storedData) {
-        try {
-          data = JSON.parse(storedData);
-          // Clear the session storage after using it
-          sessionStorage.removeItem('examResults');
-        } catch (error) {
-          console.error('Failed to parse stored exam results:', error);
+    console.log('Results page mounted');
+    console.log('Location state:', location.state);
+
+    const loadResultsData = () => {
+      // Try to get data from location.state first (direct navigation from exam)
+      let data = location.state;
+      
+      // If no data in location.state, try sessionStorage
+      if (!data?.answers || !data?.questions) {
+        console.log('No data in location.state, checking sessionStorage...');
+        const storedData = sessionStorage.getItem('examResults');
+        if (storedData) {
+          try {
+            data = JSON.parse(storedData);
+            console.log('Found data in sessionStorage:', data);
+            // Clear the session storage after using it
+            sessionStorage.removeItem('examResults');
+          } catch (error) {
+            console.error('Failed to parse stored exam results:', error);
+          }
         }
       }
-    }
 
-    // Validate we have the minimum required data
-    if (!data?.answers || !data?.questions || !Array.isArray(data.questions)) {
-      console.error('Missing required results data:', data);
-      navigate('/');
-      return;
-    }
+      // Validate we have the minimum required data
+      if (!data?.answers || !data?.questions || !Array.isArray(data.questions)) {
+        console.error('Missing required results data:', data);
+        navigate('/', { replace: true });
+        return;
+      }
 
-    // Ensure we have a subject
-    const subject = data.subject || 'Unknown';
-    
-    // Ensure answers is an object and questions is an array
-    const answers = typeof data.answers === 'object' ? data.answers : {};
-    const questions = Array.isArray(data.questions) ? data.questions : [];
-    
-    // Calculate time spent - prioritize timeTaken from submission, then timeSpent from state
-    let timeSpent = 0;
-    if (data.timeTaken !== undefined) {
-      timeSpent = data.timeTaken; // This is in minutes from submission
-    } else if (data.timeSpent !== undefined) {
-      timeSpent = data.timeSpent; // This might be in different units, keep as is
-    }
+      console.log('Valid results data found:', {
+        questionsCount: data.questions.length,
+        answersCount: Object.keys(data.answers || {}).length,
+        subject: data.subject,
+        score: data.score,
+        percentage: data.percentage
+      });
 
-    // Prepare question time data with validation
-    let questionTimeData: Array<{ questionNumber: number; timeSpent: number }> = [];
-    if (data.questionTimeData && Array.isArray(data.questionTimeData)) {
-      questionTimeData = data.questionTimeData.filter(item => 
-        typeof item === 'object' && 
-        typeof item.questionNumber === 'number' && 
-        typeof item.timeSpent === 'number'
-      );
-    }
+      // Ensure we have a subject
+      const subject = data.subject || 'Unknown';
+      
+      // Ensure answers is an object and questions is an array
+      const answers = typeof data.answers === 'object' ? data.answers : {};
+      const questions = Array.isArray(data.questions) ? data.questions : [];
+      
+      // Calculate time spent - prioritize timeTaken from submission, then timeSpent from state
+      let timeSpent = 0;
+      if (data.timeTaken !== undefined) {
+        timeSpent = data.timeTaken; // This is in minutes from submission
+      } else if (data.timeSpent !== undefined) {
+        timeSpent = data.timeSpent; // This might be in different units, keep as is
+      }
 
-    setResultsData({
-      sessionId: data.sessionId,
-      score: data.score,
-      maxScore: data.maxScore,
-      percentage: data.percentage,
-      answeredQuestions: data.answeredQuestions,
-      totalQuestions: data.totalQuestions || questions.length,
-      timeTaken: data.timeTaken,
-      answers,
-      questions,
-      subject,
-      questionTimeData
-    });
+      // Prepare question time data with validation
+      let questionTimeData: Array<{ questionNumber: number; timeSpent: number }> = [];
+      if (data.questionTimeData && Array.isArray(data.questionTimeData)) {
+        questionTimeData = data.questionTimeData.filter(item => 
+          typeof item === 'object' && 
+          typeof item.questionNumber === 'number' && 
+          typeof item.timeSpent === 'number'
+        );
+      }
+
+      const finalResultsData: ResultsData = {
+        sessionId: data.sessionId,
+        score: data.score,
+        maxScore: data.maxScore,
+        percentage: data.percentage,
+        answeredQuestions: data.answeredQuestions,
+        totalQuestions: data.totalQuestions || questions.length,
+        timeTaken: data.timeTaken,
+        timeSpent: data.timeSpent,
+        answers,
+        questions,
+        subject,
+        questionTimeData
+      };
+
+      console.log('Final results data prepared:', finalResultsData);
+      setResultsData(finalResultsData);
+      setIsLoading(false);
+    };
+
+    loadResultsData();
   }, [location.state, navigate]);
 
-  if (!resultsData) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading results...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!resultsData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">No Results Found</h2>
+          <p className="text-gray-600 mb-4">Unable to load test results.</p>
+          <button 
+            onClick={() => navigate('/')} 
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          >
+            Go Home
+          </button>
         </div>
       </div>
     );
@@ -122,7 +163,7 @@ const Results = () => {
   }
 
   // Calculate time spent for display - convert minutes to proper format
-  const timeSpentInMinutes = resultsData.timeTaken || 0;
+  const timeSpentInMinutes = resultsData.timeTaken || resultsData.timeSpent || 0;
   const timeSpentFormatted = formatTimeSpent(timeSpentInMinutes);
 
   const gradeInfo = getGrade(finalPercentage);
@@ -147,7 +188,7 @@ const Results = () => {
         };
       });
 
-  console.log('Results - Final data:', {
+  console.log('Results - Final data for display:', {
     answers: Object.keys(answers).length,
     questions: questions.length,
     score: results.score,

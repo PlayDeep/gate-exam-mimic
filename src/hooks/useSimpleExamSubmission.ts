@@ -30,6 +30,10 @@ export const useSimpleExamSubmission = ({
     if (!sessionId || isSubmitting) return;
 
     console.log('Starting exam submission...');
+    console.log('Session ID:', sessionId);
+    console.log('Questions:', questions.length);
+    console.log('Answers:', Object.keys(answers).length);
+    
     setIsSubmitting(true);
 
     try {
@@ -86,27 +90,42 @@ export const useSimpleExamSubmission = ({
 
       console.log('Exam submitted successfully');
       
+      // Prepare complete results data
+      const resultsData = {
+        sessionId,
+        score: totalScore,
+        maxScore: maxPossibleScore,
+        percentage,
+        answeredQuestions,
+        totalQuestions,
+        timeTaken: timeTakenInMinutes,
+        timeSpent: timeTakenInMinutes, // For backward compatibility
+        answers,
+        questions,
+        subject: subject || 'Unknown',
+        questionTimeData: questionTimeData || []
+      };
+
+      console.log('Prepared results data:', resultsData);
+
+      // Store in sessionStorage as backup
+      try {
+        sessionStorage.setItem('examResults', JSON.stringify(resultsData));
+        console.log('Results data stored in sessionStorage');
+      } catch (error) {
+        console.error('Failed to store results in sessionStorage:', error);
+      }
+
       toast({
         title: "Exam Submitted",
         description: "Your test has been submitted successfully.",
       });
 
       // Navigate to results with complete data
+      console.log('Navigating to results page...');
       navigate('/results', {
-        state: {
-          sessionId,
-          score: totalScore,
-          maxScore: maxPossibleScore,
-          percentage,
-          answeredQuestions,
-          totalQuestions,
-          timeTaken: timeTakenInMinutes,
-          timeSpent: timeTakenInMinutes, // For backward compatibility
-          answers,
-          questions,
-          subject: subject || 'Unknown',
-          questionTimeData: questionTimeData || []
-        }
+        state: resultsData,
+        replace: true // Use replace to prevent going back to exam
       });
     } catch (error) {
       console.error('Error submitting exam:', error);

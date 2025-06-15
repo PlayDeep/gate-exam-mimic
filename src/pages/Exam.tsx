@@ -216,6 +216,29 @@ const Exam = () => {
     window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
   };
 
+  // Handle submit with proper logging
+  const handleSubmit = async () => {
+    console.log('Submit button clicked');
+    console.log('Current state:', {
+      sessionId,
+      questionsLength: questions.length,
+      answersCount: Object.keys(answers).length,
+      isSubmitting
+    });
+    
+    if (!sessionId) {
+      console.error('No session ID available');
+      toast({
+        title: "Error",
+        description: "No active session found.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await submitExam();
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -253,7 +276,7 @@ const Exam = () => {
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
         onOpenCalculator={openCalculator}
-        onSubmitExam={submitExam}
+        onSubmitExam={handleSubmit}
         isSubmitting={isSubmitting}
       />
 
