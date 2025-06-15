@@ -1,4 +1,3 @@
-
 import { Trophy, Clock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -65,7 +64,7 @@ const ScoreOverview = ({
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div className="space-y-6 mb-8">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -105,7 +104,7 @@ const ScoreOverview = ({
         </CardContent>
       </Card>
 
-      <Card className="lg:col-span-1">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Clock className="w-6 h-6 text-blue-500" />
