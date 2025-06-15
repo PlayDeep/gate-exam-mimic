@@ -41,8 +41,14 @@ const ScoreOverview = ({
   const totalAvailableTime = 180 * 60; // 3 hours in seconds
   const timeUtilization = Math.round((totalTimeSpent / totalAvailableTime) * 100);
   
-  // Use real time data if available, otherwise generate chart data
-  const chartData = questionTimeData.length > 0 
+  // Check if we have real time data
+  const hasRealTimeData = questionTimeData && questionTimeData.length > 0 && questionTimeData.some(q => q.timeSpent > 0);
+  
+  console.log('ScoreOverview - Question time data:', questionTimeData);
+  console.log('ScoreOverview - Has real time data:', hasRealTimeData);
+  
+  // Use real time data if available, otherwise generate fallback
+  const chartData = hasRealTimeData
     ? questionTimeData.slice(0, 20).map(item => ({
         question: `Q${item.questionNumber}`,
         timeSpent: item.timeSpent
@@ -53,10 +59,18 @@ const ScoreOverview = ({
       }));
 
   // Calculate time distribution from real data
-  const answeredQuestionsWithTime = questionTimeData.filter(q => answers[q.questionNumber]);
+  const answeredQuestionsWithTime = hasRealTimeData 
+    ? questionTimeData.filter(q => answers[q.questionNumber] && q.timeSpent > 0)
+    : [];
+    
   const fastQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent < 30).length;
   const mediumQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent >= 30 && q.timeSpent <= 90).length;
   const slowQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent > 90).length;
+
+  // If no real time data, use fallback calculations
+  const fallbackFast = hasRealTimeData ? fastQuestions : Math.floor(answeredQuestions * 0.3);
+  const fallbackMedium = hasRealTimeData ? mediumQuestions : Math.floor(answeredQuestions * 0.5);
+  const fallbackSlow = hasRealTimeData ? slowQuestions : Math.floor(answeredQuestions * 0.2);
 
   const chartConfig = {
     timeSpent: {
@@ -112,7 +126,7 @@ const ScoreOverview = ({
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Clock className="w-6 h-6 text-blue-500" />
-            <span>Time Analysis {questionTimeData.length > 0 ? '(Real Data)' : '(Simulated)'}</span>
+            <span>Time Analysis {hasRealTimeData ? '(Real Data)' : '(Simulated Data)'}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -200,20 +214,20 @@ const ScoreOverview = ({
               </div>
             </div>
             
-            {/* Time Distribution - Use real data if available */}
+            {/* Time Distribution */}
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-800">Time Distribution</h4>
+              <h4 className="font-medium text-gray-800">Time Distribution {hasRealTimeData ? '(Real Data)' : '(Estimated)'}</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <div className="font-semibold text-green-600 text-xl">{fastQuestions}</div>
+                  <div className="font-semibold text-green-600 text-xl">{fallbackFast}</div>
                   <div className="text-sm text-gray-600">Quick (&lt;30s)</div>
                 </div>
                 <div className="text-center">
-                  <div className="font-semibold text-yellow-600 text-xl">{mediumQuestions}</div>
+                  <div className="font-semibold text-yellow-600 text-xl">{fallbackMedium}</div>
                   <div className="text-sm text-gray-600">Medium (30-90s)</div>
                 </div>
                 <div className="text-center">
-                  <div className="font-semibold text-red-600 text-xl">{slowQuestions}</div>
+                  <div className="font-semibold text-red-600 text-xl">{fallbackSlow}</div>
                   <div className="text-sm text-gray-600">Slow (&gt;90s)</div>
                 </div>
                 <div className="text-center">
@@ -240,10 +254,16 @@ const ScoreOverview = ({
               </div>
             )}
 
-            {questionTimeData.length > 0 && (
+            {hasRealTimeData ? (
               <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                 <p className="text-sm text-green-800">
                   <strong>Note:</strong> Time analysis is based on actual time spent on each question, including revisits.
+                </p>
+              </div>
+            ) : (
+              <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <p className="text-sm text-orange-800">
+                  <strong>Note:</strong> Time analysis is based on estimated data as real time tracking data was not available.
                 </p>
               </div>
             )}

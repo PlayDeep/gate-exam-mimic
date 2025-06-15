@@ -110,12 +110,13 @@ export const useExamLogic = ({
     initializeTest();
   }, [subject, user, navigate, toast, setIsLoading, setQuestions, setSessionId]);
 
-  // Start timer for first question when exam loads
+  // Start timer for first question when exam loads and handle question changes
   useEffect(() => {
     if (!isLoading && totalQuestions > 0) {
+      console.log('Starting timer for question:', currentQuestion);
       startTimer(currentQuestion);
     }
-  }, [isLoading, totalQuestions, startTimer, currentQuestion]);
+  }, [currentQuestion, isLoading, totalQuestions, startTimer]);
 
   // Timer effect
   useEffect(() => {
@@ -194,7 +195,7 @@ export const useExamLogic = ({
       
       // Get actual time spent on this question
       const timeSpent = getTimeSpent(questionId);
-      console.log('Time Spent on Question:', timeSpent);
+      console.log('Time Spent on Question:', timeSpent, 'seconds');
       console.log('=== ANSWER CHANGE END ===');
       
       try {
@@ -314,6 +315,7 @@ export const useExamLogic = ({
       
       // Get all time data for results
       const questionTimeData = getAllTimeData();
+      console.log('All time data being passed to results:', questionTimeData);
       
       navigate('/results', { 
         state: { 
@@ -355,8 +357,6 @@ export const useExamLogic = ({
       const nextQuestion = currentQuestion + 1;
       console.log('Moving to question:', nextQuestion);
       
-      // Start timer for next question
-      startTimer(nextQuestion);
       setCurrentQuestion(nextQuestion);
     } else {
       console.log('Cannot move to next question. Loading:', isLoading, 'Total:', totalQuestions, 'Current:', currentQuestion);
@@ -369,8 +369,6 @@ export const useExamLogic = ({
       const prevQuestion = currentQuestion - 1;
       console.log('Moving to question:', prevQuestion);
       
-      // Start timer for previous question
-      startTimer(prevQuestion);
       setCurrentQuestion(prevQuestion);
     } else {
       console.log('Cannot move to previous question. Loading:', isLoading, 'Current:', currentQuestion);
@@ -379,8 +377,6 @@ export const useExamLogic = ({
 
   const navigateToQuestion = (questionNum: number) => {
     console.log('Question grid clicked:', questionNum);
-    // Start timer for selected question
-    startTimer(questionNum);
     setCurrentQuestion(questionNum);
   };
 
