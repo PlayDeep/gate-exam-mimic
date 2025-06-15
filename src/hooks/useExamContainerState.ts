@@ -1,6 +1,5 @@
 
-import { useEffect, useRef } from "react";
-import { useSimpleExamState } from "@/hooks/useSimpleExamState";
+import { useState, useEffect, useRef } from "react";
 import { Question } from "@/services/questionService";
 
 interface UseExamContainerStateProps {
@@ -12,37 +11,99 @@ export const useExamContainerState = ({
   initialQuestions,
   initialSessionId
 }: UseExamContainerStateProps) => {
-  const isInitializedRef = useRef(false);
+  const [timeLeft, setTimeLeft] = useState(10800); // 3 hours in seconds
+  const [currentQuestion, setCurrentQuestion] = useState(1);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [markedForReview, setMarkedForReview] = useState<Set<number>>(new Set());
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [questions] = useState<Question[]>(initialQuestions);
+  const [sessionId] = useState<string>(initialSessionId);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isMountedRef = useRef(true);
-  
-  const examState = useSimpleExamState();
+
+  const totalQuestions = questions.length;
 
   // Component mount tracking
   useEffect(() => {
-    console.log('ExamContainer: Component mounting');
     isMountedRef.current = true;
     return () => {
-      console.log('ExamContainer: Component unmounting');
       isMountedRef.current = false;
     };
   }, []);
 
-  // Initialize with props
+  // Initialize loading state
   useEffect(() => {
-    if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current && isMountedRef.current) {
-      console.log('ExamContainer: Initializing with props data');
-      console.log('Questions count:', initialQuestions.length);
-      console.log('Session ID:', initialSessionId);
-      examState.setQuestions(initialQuestions);
-      examState.setSessionId(initialSessionId);
-      examState.setIsLoading(false);
-      isInitializedRef.current = true;
+    if (questions.length > 0 && sessionId) {
+      setIsLoading(false);
     }
-  }, [initialQuestions, initialSessionId, examState.setQuestions, examState.setSessionId, examState.setIsLoading]);
+  }, [questions.length, sessionId]);
+
+  const clearAnswer = (questionNumber: number) => {
+    setAnswers(prev => {
+      const newAnswers = { ...prev };
+      delete newAnswers[questionNumber];
+      return newAnswers;
+    });
+  };
+
+  const navigateToQuestion = (questionNumber: number) => {
+    if (questionNumber >= 1 && questionNumber <= totalQuestions) {
+      setCurrentQuestion(questionNumber);
+    }
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestion < totalQuestions) {
+      setCurrentQuestion(prev => prev + 1);
+    }
+  };
+
+  const previousQuestion = () => {
+    if (currentQuestion > 1) {
+      setCurrentQuestion(prev => prev - 1);
+    }
+  };
+
+  const toggleMarkForReview = (questionNumber: number) => {
+    setMarkedForReview(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(questionNumber)) {
+        newSet.delete(questionNumber);
+      } else {
+        newSet.add(questionNumber);
+      }
+      return newSet;
+    });
+  };
+
+  const updateAnswer = (questionNumber: number, answer: string) => {
+    setAnswers(prev => ({
+      ...prev,
+      [questionNumber]: answer
+    }));
+  };
 
   return {
-    ...examState,
-    isMountedRef,
-    isInitializedRef
+    timeLeft,
+    setTimeLeft,
+    currentQuestion,
+    answers,
+    markedForReview,
+    isFullscreen,
+    setIsFullscreen,
+    questions,
+    sessionId,
+    isLoading,
+    isSubmitting,
+    setIsSubmitting,
+    totalQuestions,
+    clearAnswer,
+    navigateToQuestion,
+    nextQuestion,
+    previousQuestion,
+    toggleMarkForReview,
+    updateAnswer,
+    isMountedRef
   };
 };

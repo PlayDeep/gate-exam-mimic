@@ -1,12 +1,12 @@
 
-import { saveUserAnswer } from '@/services/testService';
+import { useCallback } from 'react';
 import { Question } from '@/services/questionService';
 
 interface UseExamAnswerHandlerProps {
   sessionId: string;
   questions: Question[];
-  updateAnswer: (questionId: number, answer: string) => void;
-  getTimeSpent: (questionId: number) => number;
+  updateAnswer: (questionNumber: number, answer: string) => void;
+  getTimeSpent: (questionNumber: number) => number;
 }
 
 export const useExamAnswerHandler = ({
@@ -16,39 +16,23 @@ export const useExamAnswerHandler = ({
   getTimeSpent
 }: UseExamAnswerHandlerProps) => {
   
-  const handleAnswerChange = async (questionId: number, answer: string) => {
-    console.log(`AnswerHandler: Answer changed for Q${questionId}:`, answer);
-    updateAnswer(questionId, answer);
+  const handleAnswerChange = useCallback((questionNumber: number, selectedAnswer: string) => {
+    console.log('Answer changed for question', questionNumber, ':', selectedAnswer);
     
-    if (sessionId && questions[questionId - 1]) {
-      const question = questions[questionId - 1];
-      const normalizedAnswer = String(answer).trim();
-      const normalizedCorrectAnswer = String(question.correct_answer || '').trim();
-      const isCorrect = normalizedAnswer === normalizedCorrectAnswer;
-      
-      let marksAwarded = 0;
-      if (isCorrect) {
-        marksAwarded = question.marks || 1;
-      } else if (question.question_type === 'MCQ') {
-        marksAwarded = -(question.negative_marks || 0);
-      }
-      
-      try {
-        await saveUserAnswer(
-          sessionId,
-          question.id,
-          answer,
-          isCorrect,
-          marksAwarded,
-          getTimeSpent(questionId)
-        );
-        console.log(`AnswerHandler: Answer saved successfully for Q${questionId}`);
-      } catch (error) {
-        console.error(`AnswerHandler: Error saving answer for Q${questionId}:`, error);
-        // Don't throw error to user, just log it - exam can continue
-      }
+    // Validate question number
+    if (questionNumber < 1 || questionNumber > questions.length) {
+      console.error('Invalid question number:', questionNumber);
+      return;
     }
-  };
+
+    // Update the answer
+    updateAnswer(questionNumber, selectedAnswer);
+    
+    // Log time spent on this question
+    const timeSpent = getTimeSpent(questionNumber);
+    console.log(`Time spent on question ${questionNumber}:`, timeSpent, 'seconds');
+    
+  }, [questions.length, updateAnswer, getTimeSpent]);
 
   return {
     handleAnswerChange
