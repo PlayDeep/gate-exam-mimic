@@ -13,7 +13,6 @@ export const useExamInitialization = () => {
   const { user, loading } = useAuth();
   const { toast } = useToast();
   const initializationAttemptedRef = useRef(false);
-  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
   
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -26,10 +25,6 @@ export const useExamInitialization = () => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
-      if (navigationTimeoutRef.current) {
-        clearTimeout(navigationTimeoutRef.current);
-        navigationTimeoutRef.current = null;
-      }
     };
   }, []);
 
@@ -76,9 +71,10 @@ export const useExamInitialization = () => {
         setIsLoading(true);
         setError(null);
         
+        // Fetch questions
         const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
         
-        if (!isMountedRef.current) return; // Check if still mounted
+        if (!isMountedRef.current) return;
         
         if (!Array.isArray(fetchedQuestions) || fetchedQuestions.length === 0) {
           throw new Error(`No questions found for subject: ${subject}`);
@@ -96,12 +92,13 @@ export const useExamInitialization = () => {
         
         console.log('useExamInitialization: Questions loaded successfully:', fetchedQuestions.length);
         
-        if (!isMountedRef.current) return; // Check if still mounted
+        if (!isMountedRef.current) return;
         setQuestions(fetchedQuestions);
         
+        // Create session
         const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
         
-        if (!isMountedRef.current) return; // Check if still mounted
+        if (!isMountedRef.current) return;
         
         if (!newSessionId || typeof newSessionId !== 'string') {
           throw new Error('Failed to create valid test session');
@@ -113,7 +110,7 @@ export const useExamInitialization = () => {
         console.log('useExamInitialization: Exam initialization complete');
         
       } catch (error) {
-        if (!isMountedRef.current) return; // Check if still mounted
+        if (!isMountedRef.current) return;
         
         console.error('useExamInitialization: Error during initialization:', error);
         
@@ -129,14 +126,8 @@ export const useExamInitialization = () => {
           variant: "destructive",
         });
         
-        // Clear any existing timeout
-        if (navigationTimeoutRef.current) {
-          clearTimeout(navigationTimeoutRef.current);
-          navigationTimeoutRef.current = null;
-        }
-        
-        // Delay navigation to allow user to see the error
-        navigationTimeoutRef.current = setTimeout(() => {
+        // Navigate back after delay
+        setTimeout(() => {
           if (isMountedRef.current) {
             navigate('/', { replace: true });
           }

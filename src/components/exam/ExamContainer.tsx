@@ -22,7 +22,6 @@ interface ExamContainerProps {
 const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionId, subject }: ExamContainerProps) => {
   const isInitializedRef = useRef(false);
   const isMountedRef = useRef(true);
-  const propsRef = useRef({ questions: initialQuestions, sessionId: initialSessionId });
   
   const {
     timeLeft,
@@ -91,7 +90,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
   const { toggleFullscreen } = useExamFullscreen({ setIsFullscreen });
 
-  // Component mounted tracking
+  // Component mount tracking
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -99,23 +98,16 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     };
   }, []);
 
-  // Update props ref when props change
+  // Initialize with props - simplified approach
   useEffect(() => {
-    propsRef.current = { questions: initialQuestions, sessionId: initialSessionId };
-  }, [initialQuestions, initialSessionId]);
-
-  // Initialize with props - only once to prevent loops
-  useEffect(() => {
-    const { questions: propQuestions, sessionId: propSessionId } = propsRef.current;
-    
-    if (propQuestions.length > 0 && propSessionId && !isInitializedRef.current && isMountedRef.current) {
+    if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current && isMountedRef.current) {
       console.log('ExamContainer: Initializing with props data');
-      setQuestions(propQuestions);
-      setSessionId(propSessionId);
+      setQuestions(initialQuestions);
+      setSessionId(initialSessionId);
       setIsLoading(false);
       isInitializedRef.current = true;
     }
-  }, []); // Empty dependency array - initialization should only happen once
+  }, [initialQuestions, initialSessionId, setQuestions, setSessionId, setIsLoading]);
 
   // Cleanup effect
   useEffect(() => {
@@ -134,19 +126,12 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     console.log('ExamContainer: Submit button clicked');
     
     if (!sessionId || questions.length === 0 || isSubmitting || !isMountedRef.current) {
-      console.log('ExamContainer: Invalid state for submission:', { 
-        sessionId: !!sessionId, 
-        questionsLength: questions.length, 
-        isSubmitting,
-        isMounted: isMountedRef.current 
-      });
+      console.log('ExamContainer: Invalid state for submission');
       return;
     }
 
-    // Clean up timer before submission
     cleanupTimers();
     
-    console.log('ExamContainer: Proceeding with submission...');
     try {
       await submitExam();
     } catch (error) {

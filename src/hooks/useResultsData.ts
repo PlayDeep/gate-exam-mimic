@@ -27,110 +27,78 @@ export const useResultsData = () => {
   useEffect(() => {
     console.log('useResultsData: Loading results data');
     
-    let redirectTimeout: NodeJS.Timeout | null = null;
     let isMounted = true;
     
     const loadResultsData = () => {
       try {
         let data = location.state;
         
-        // Try location.state first, then sessionStorage as fallback
+        // Try sessionStorage as fallback
         if (!data || !data.answers || !data.questions) {
-          console.log('useResultsData: Invalid location.state, checking sessionStorage...');
+          console.log('useResultsData: Trying sessionStorage fallback');
           
-          try {
-            const storedData = sessionStorage.getItem('examResults');
-            if (storedData) {
-              data = JSON.parse(storedData);
-              sessionStorage.removeItem('examResults');
-              console.log('useResultsData: Successfully loaded data from sessionStorage');
-            }
-          } catch (parseError) {
-            console.error('useResultsData: Failed to parse stored exam results:', parseError);
-            throw new Error('Failed to load stored results - corrupted data');
+          const storedData = sessionStorage.getItem('examResults');
+          if (storedData) {
+            data = JSON.parse(storedData);
+            sessionStorage.removeItem('examResults');
+            console.log('useResultsData: Loaded from sessionStorage');
           }
         }
 
-        // Final validation
+        // Validate data
         if (!data) {
-          throw new Error('No exam results data available from any source');
+          throw new Error('No exam results data available');
         }
 
         if (!data.answers || typeof data.answers !== 'object') {
-          throw new Error('Invalid or missing answers data');
+          throw new Error('Invalid answers data');
         }
 
         if (!data.questions || !Array.isArray(data.questions) || data.questions.length === 0) {
-          throw new Error('Invalid or missing questions data');
+          throw new Error('Invalid questions data');
         }
 
-        // Validate question structure with enhanced checks
+        // Validate questions structure
         const hasValidQuestions = data.questions.every((q, index) => {
-          if (!q || typeof q !== 'object') {
-            console.error(`Question ${index + 1} is not a valid object:`, q);
-            return false;
-          }
-          if (q.correct_answer === undefined) {
-            console.error(`Question ${index + 1} missing correct_answer:`, q);
-            return false;
-          }
-          if (!q.question_text || typeof q.question_text !== 'string') {
-            console.error(`Question ${index + 1} missing or invalid question_text:`, q);
-            return false;
-          }
+          if (!q || typeof q !== 'object') return false;
+          if (q.correct_answer === undefined) return false;
+          if (!q.question_text || typeof q.question_text !== 'string') return false;
           return true;
         });
 
         if (!hasValidQuestions) {
-          throw new Error('Questions data is incomplete or invalid');
+          throw new Error('Questions data is incomplete');
         }
 
-        // Enhanced validation and cleanup for questionTimeData
+        // Process question time data
         let questionTimeData: Array<{ questionNumber: number; timeSpent: number }> = [];
         if (data.questionTimeData && Array.isArray(data.questionTimeData)) {
           questionTimeData = data.questionTimeData
-            .filter(item => {
-              // More lenient validation - allow any reasonable numeric values
-              if (!item || typeof item !== 'object') return false;
-              if (typeof item.questionNumber !== 'number' || typeof item.timeSpent !== 'number') return false;
-              if (!isFinite(item.questionNumber) || !isFinite(item.timeSpent)) return false;
-              if (isNaN(item.questionNumber) || isNaN(item.timeSpent)) return false;
-              return true;
-            })
+            .filter(item => item && typeof item.questionNumber === 'number' && typeof item.timeSpent === 'number')
             .map(item => ({
-              questionNumber: Math.max(1, Math.floor(Math.abs(item.questionNumber))), // Ensure positive integer >= 1
-              timeSpent: Math.max(0, Math.floor(item.timeSpent)) // Ensure non-negative integer
+              questionNumber: Math.max(1, Math.floor(item.questionNumber)),
+              timeSpent: Math.max(0, Math.floor(item.timeSpent))
             }))
-            .filter(item => item.questionNumber > 0 && item.questionNumber <= data.questions.length); // Valid question range
-          
-          console.log('useResultsData: Validated question time data:', questionTimeData.length, 'entries');
+            .filter(item => item.questionNumber <= data.questions.length);
         }
 
-        // Enhanced data validation with defaults
+        // Create final results data
         const finalResultsData: ResultsData = {
-          sessionId: typeof data.sessionId === 'string' ? data.sessionId : undefined,
-          score: typeof data.score === 'number' && isFinite(data.score) ? data.score : undefined,
-          maxScore: typeof data.maxScore === 'number' && isFinite(data.maxScore) ? data.maxScore : undefined,
-          percentage: typeof data.percentage === 'number' && isFinite(data.percentage) && data.percentage >= 0 && data.percentage <= 100 ? data.percentage : undefined,
-          answeredQuestions: typeof data.answeredQuestions === 'number' && isFinite(data.answeredQuestions) ? data.answeredQuestions : Object.keys(data.answers).length,
-          totalQuestions: typeof data.totalQuestions === 'number' && isFinite(data.totalQuestions) ? data.totalQuestions : data.questions.length,
-          timeTaken: typeof data.timeTaken === 'number' && isFinite(data.timeTaken) ? data.timeTaken : undefined,
-          timeSpent: typeof data.timeSpent === 'number' && isFinite(data.timeSpent) ? data.timeSpent : undefined,
+          sessionId: data.sessionId,
+          score: typeof data.score === 'number' ? data.score : undefined,
+          maxScore: typeof data.maxScore === 'number' ? data.maxScore : undefined,
+          percentage: typeof data.percentage === 'number' ? data.percentage : undefined,
+          answeredQuestions: typeof data.answeredQuestions === 'number' ? data.answeredQuestions : Object.keys(data.answers).length,
+          totalQuestions: typeof data.totalQuestions === 'number' ? data.totalQuestions : data.questions.length,
+          timeTaken: typeof data.timeTaken === 'number' ? data.timeTaken : undefined,
+          timeSpent: typeof data.timeSpent === 'number' ? data.timeSpent : undefined,
           answers: data.answers,
           questions: data.questions,
-          subject: typeof data.subject === 'string' && data.subject.trim() ? data.subject.trim() : 'Unknown',
+          subject: typeof data.subject === 'string' ? data.subject.trim() : 'Unknown',
           questionTimeData
         };
 
-        console.log('useResultsData: Final results data prepared successfully');
-        console.log('useResultsData: Data summary:', {
-          hasScore: finalResultsData.score !== undefined,
-          hasPercentage: finalResultsData.percentage !== undefined,
-          answersCount: Object.keys(finalResultsData.answers).length,
-          questionsCount: finalResultsData.questions.length,
-          hasTimeData: finalResultsData.questionTimeData && finalResultsData.questionTimeData.length > 0,
-          subject: finalResultsData.subject
-        });
+        console.log('useResultsData: Results processed successfully');
         
         if (isMounted) {
           setResultsData(finalResultsData);
@@ -139,12 +107,12 @@ export const useResultsData = () => {
       } catch (error) {
         if (!isMounted) return;
         
-        console.error('useResultsData: Error loading results data:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to load exam results';
+        console.error('useResultsData: Error loading results:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load results';
         setError(errorMessage);
         
-        // Redirect to home after showing error with proper cleanup
-        redirectTimeout = setTimeout(() => {
+        // Redirect after delay
+        setTimeout(() => {
           if (isMounted) {
             navigate('/', { replace: true });
           }
@@ -158,12 +126,8 @@ export const useResultsData = () => {
 
     loadResultsData();
 
-    // Cleanup function to clear timeout and mark as unmounted
     return () => {
       isMounted = false;
-      if (redirectTimeout) {
-        clearTimeout(redirectTimeout);
-      }
     };
   }, [location.state, navigate]);
 

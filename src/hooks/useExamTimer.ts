@@ -19,6 +19,7 @@ export const useExamTimer = ({
   const onTimeUpRef = useRef(onTimeUp);
   const hasCalledTimeUpRef = useRef(false);
   const isMountedRef = useRef(true);
+  const isTimerActiveRef = useRef(false);
 
   // Keep onTimeUp reference current
   useEffect(() => {
@@ -46,23 +47,19 @@ export const useExamTimer = ({
       console.log('Timer: Cleaning up timer');
       clearInterval(timerRef.current);
       timerRef.current = null;
+      isTimerActiveRef.current = false;
     }
   }, []);
 
-  useEffect(() => {
-    // Clean up any existing timer first
-    cleanupTimer();
-    
-    // Reset time up flag when starting new timer
-    hasCalledTimeUpRef.current = false;
-    
-    // Don't start timer if loading, no session, or already called time up
-    if (isLoading || !sessionId || timeLeft <= 0) {
-      console.log('Timer: Not starting - isLoading:', isLoading, 'sessionId:', !!sessionId, 'timeLeft:', timeLeft);
+  const startTimer = useCallback(() => {
+    // Prevent multiple timers
+    if (isTimerActiveRef.current) {
+      console.log('Timer: Already active, skipping start');
       return;
     }
-    
+
     console.log('Timer: Starting countdown timer with', timeLeft, 'seconds');
+    isTimerActiveRef.current = true;
     
     timerRef.current = setInterval(() => {
       if (!isMountedRef.current) {
@@ -74,15 +71,37 @@ export const useExamTimer = ({
         const newTime = Math.max(0, prev - 1);
         if (newTime <= 0 && !hasCalledTimeUpRef.current) {
           console.log('Timer: Time reached 0, triggering time up');
-          // Use setTimeout to avoid calling during render
           setTimeout(() => handleTimeUp(), 0);
         }
         return newTime;
       });
     }, 1000);
+  }, [timeLeft, setTimeLeft, handleTimeUp, cleanupTimer]);
 
+  // Main timer effect - only start when conditions are met
+  useEffect(() => {
+    // Clean up any existing timer first
+    cleanupTimer();
+    
+    // Reset time up flag when starting new session
+    if (sessionId) {
+      hasCalledTimeUpRef.current = false;
+    }
+    
+    // Don't start timer if loading, no session, already called time up, or time is up
+    if (isLoading || !sessionId || timeLeft <= 0 || hasCalledTimeUpRef.current) {
+      console.log('Timer: Not starting - isLoading:', isLoading, 'sessionId:', !!sessionId, 'timeLeft:', timeLeft, 'hasCalledTimeUp:', hasCalledTimeUpRef.current);
+      return;
+    }
+    
+    startTimer();
     return cleanupTimer;
-  }, [isLoading, sessionId, timeLeft, setTimeLeft, handleTimeUp, cleanupTimer]);
+  }, [isLoading, sessionId, startTimer, cleanupTimer]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return cleanupTimer;
+  }, [cleanupTimer]);
 
   const formatTime = (seconds: number) => {
     const validSeconds = Math.max(0, Math.floor(seconds));
