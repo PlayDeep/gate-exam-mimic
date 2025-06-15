@@ -65,7 +65,7 @@ const Exam = () => {
   const { formattedTime } = useExamTimer({
     timeLeft,
     setTimeLeft,
-    isLoading,
+    isLoading: isLoading || questions.length === 0,
     sessionId,
     onTimeUp: submitExam
   });
@@ -82,13 +82,14 @@ const Exam = () => {
     }
   }, [user, loading, navigate, toast]);
 
-  // Initialize exam
+  // Initialize exam - only run once
   useEffect(() => {
     const initializeExam = async () => {
-      if (!subject || !user) return;
+      if (!subject || !user || sessionId) return; // Don't reinitialize if already done
       
       try {
         setIsLoading(true);
+        console.log('Initializing exam for subject:', subject);
         
         const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
         
@@ -102,13 +103,12 @@ const Exam = () => {
           return;
         }
         
+        console.log('Questions loaded:', fetchedQuestions.length);
         setQuestions(fetchedQuestions);
         
         const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
+        console.log('Session created:', newSessionId);
         setSessionId(newSessionId);
-        
-        // Start timer for first question
-        startTimer(1);
         
       } catch (error) {
         console.error('Error initializing exam:', error);
@@ -124,11 +124,24 @@ const Exam = () => {
     };
 
     initializeExam();
-  }, [subject, user, navigate, toast, setIsLoading, setQuestions, setSessionId, startTimer]);
+  }, [subject, user]); // Removed dependencies that could cause re-runs
+
+  // Start question timer only after exam is fully initialized
+  useEffect(() => {
+    if (!isLoading && questions.length > 0 && sessionId && currentQuestion) {
+      console.log('Starting timer for question:', currentQuestion);
+      startTimer(currentQuestion);
+    }
+    
+    return () => {
+      stopTimer();
+    };
+  }, [isLoading, questions.length, sessionId, currentQuestion]);
 
   // Handle question navigation with timer
   const handleQuestionNavigation = (newQuestion: number) => {
-    if (newQuestion !== currentQuestion) {
+    if (newQuestion !== currentQuestion && !isLoading) {
+      console.log('Navigating from question', currentQuestion, 'to', newQuestion);
       stopTimer();
       navigateToQuestion(newQuestion);
       startTimer(newQuestion);
@@ -136,7 +149,7 @@ const Exam = () => {
   };
 
   const handleNext = () => {
-    if (currentQuestion < totalQuestions) {
+    if (currentQuestion < totalQuestions && !isLoading) {
       stopTimer();
       nextQuestion();
       startTimer(currentQuestion + 1);
@@ -144,7 +157,7 @@ const Exam = () => {
   };
 
   const handlePrevious = () => {
-    if (currentQuestion > 1) {
+    if (currentQuestion > 1 && !isLoading) {
       stopTimer();
       previousQuestion();
       startTimer(currentQuestion - 1);
@@ -202,13 +215,6 @@ const Exam = () => {
   const openCalculator = () => {
     window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
   };
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      stopTimer();
-    };
-  }, [stopTimer]);
 
   if (isLoading) {
     return (
