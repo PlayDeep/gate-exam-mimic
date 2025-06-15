@@ -70,6 +70,23 @@ const QuestionContent = ({
     return [];
   };
 
+  // Helper function to check if image URL is valid and not a placeholder
+  const isValidImageUrl = (url: string | undefined): boolean => {
+    if (!url) return false;
+    // Filter out common placeholder URLs
+    const placeholderPatterns = [
+      'example.com',
+      'placeholder',
+      'lorem',
+      'dummy',
+      'test.jpg',
+      'sample.png'
+    ];
+    
+    const lowerUrl = url.toLowerCase();
+    return !placeholderPatterns.some(pattern => lowerUrl.includes(pattern));
+  };
+
   return (
     <div className="flex-1 p-6 overflow-y-auto">
       <Card className="h-full">
@@ -98,7 +115,7 @@ const QuestionContent = ({
                 
                 <div className="prose prose-lg max-w-none mb-6">
                   <p>{question.question_text}</p>
-                  {question.question_image && (
+                  {question.question_image && isValidImageUrl(question.question_image) && (
                     <div className="mt-4">
                       <img 
                         src={question.question_image} 
@@ -107,6 +124,9 @@ const QuestionContent = ({
                         onError={(e) => {
                           console.error('Failed to load question image:', question.question_image);
                           e.currentTarget.style.display = 'none';
+                        }}
+                        onLoad={() => {
+                          console.log('Successfully loaded question image:', question.question_image);
                         }}
                       />
                     </div>
@@ -135,7 +155,7 @@ const QuestionContent = ({
                             <span className="font-medium mr-2">({option.id})</span>
                             <span>{option.text}</span>
                           </label>
-                          {option.image && (
+                          {option.image && isValidImageUrl(option.image) && (
                             <div className="mt-2">
                               <img 
                                 src={option.image} 
@@ -144,6 +164,9 @@ const QuestionContent = ({
                                 onError={(e) => {
                                   console.error('Failed to load option image:', option.image);
                                   e.currentTarget.style.display = 'none';
+                                }}
+                                onLoad={() => {
+                                  console.log('Successfully loaded option image:', option.image);
                                 }}
                               />
                             </div>

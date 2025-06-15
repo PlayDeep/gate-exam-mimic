@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface TestSession {
   id: string;
+  user_id: string;
   subject: string;
   start_time: string;
   end_time?: string;
@@ -11,41 +12,26 @@ export interface TestSession {
   score?: number;
   percentage?: number;
   status: string;
-  time_taken?: number;
+  is_submitted: boolean;
   submitted_at?: string;
-  is_submitted?: boolean;
-  last_activity?: string;
-}
-
-export interface UserAnswer {
-  id: string;
-  session_id: string;
-  question_id?: string;
-  user_answer?: string;
-  is_correct?: boolean;
-  marks_awarded?: number;
-  time_spent?: number;
-  answered_at: string;
+  time_taken?: number;
 }
 
 export const createTestSession = async (subject: string, totalQuestions: number): Promise<string> => {
-  const { data: { user } } = await supabase.auth.getUser();
+  console.log('Creating test session for subject:', subject, 'with', totalQuestions, 'questions');
   
-  if (!user) {
-    throw new Error('User not authenticated');
-  }
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
 
   const { data, error } = await supabase
     .from('test_sessions')
     .insert({
       user_id: user.id,
-      subject,
+      subject: subject.toUpperCase(),
       total_questions: totalQuestions,
-      status: 'in_progress',
-      is_submitted: false,
-      last_activity: new Date().toISOString()
+      status: 'in_progress'
     })
-    .select('id')
+    .select()
     .single();
 
   if (error) {
@@ -53,41 +39,26 @@ export const createTestSession = async (subject: string, totalQuestions: number)
     throw error;
   }
 
+  console.log('Test session created:', data.id);
   return data.id;
 };
 
-export const updateTestSession = async (
-  sessionId: string, 
-  updates: Partial<TestSession>
-): Promise<void> => {
-  const { error } = await supabase
-    .from('test_sessions')
-    .update({
-      ...updates,
-      last_activity: new Date().toISOString()
-    })
-    .eq('id', sessionId);
-
-  if (error) {
-    console.error('Error updating test session:', error);
-    throw error;
-  }
-};
-
-export const submitTestSession = async (
-  sessionId: string,
-  updates: Partial<TestSession>
-): Promise<void> => {
-  const submissionTime = new Date().toISOString();
+export const submitTestSession = async (sessionId: string, updateData: {
+  end_time: string;
+  answered_questions: number;
+  score: number;
+  percentage: number;
+  time_taken: number;
+}) => {
+  console.log('Submitting test session:', sessionId);
   
   const { error } = await supabase
     .from('test_sessions')
     .update({
-      ...updates,
+      ...updateData,
+      status: 'completed',
       is_submitted: true,
-      submitted_at: submissionTime,
-      last_activity: submissionTime,
-      status: 'completed'
+      submitted_at: new Date().toISOString()
     })
     .eq('id', sessionId);
 
@@ -95,6 +66,8 @@ export const submitTestSession = async (
     console.error('Error submitting test session:', error);
     throw error;
   }
+
+  console.log('Test session submitted successfully');
 };
 
 export const saveUserAnswer = async (
@@ -104,7 +77,9 @@ export const saveUserAnswer = async (
   isCorrect: boolean,
   marksAwarded: number,
   timeSpent: number
-): Promise<void> => {
+) => {
+  console.log('Saving user answer for session:', sessionId, 'question:', questionId);
+  
   const { error } = await supabase
     .from('user_answers')
     .upsert({
@@ -114,6 +89,8 @@ export const saveUserAnswer = async (
       is_correct: isCorrect,
       marks_awarded: marksAwarded,
       time_spent: timeSpent
+    }, {
+      onConflict: 'session_id,question_id'
     });
 
   if (error) {
@@ -122,49 +99,80 @@ export const saveUserAnswer = async (
   }
 };
 
-export const getUserTestSessions = async (): Promise<TestSession[]> => {
+export const getUserTests = async (): Promise<TestSession[]> => {
+  console.log('Fetching user tests');
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
   const { data, error } = await supabase
     .from('test_sessions')
     .select('*')
+    .eq('user_id', user.id)
     .order('start_time', { ascending: false });
 
   if (error) {
-    console.error('Error fetching test sessions:', error);
-    return [];
+    console.error('Error fetching user tests:', error);
+    throw error;
   }
 
   return data || [];
 };
 
-export const getTestSessionDetails = async (sessionId: string) => {
-  const { data: session, error: sessionError } = await supabase
+export const deleteTestSession = async (sessionId: string): Promise<void> => {
+  console.log('Deleting test session:', sessionId);
+  
+  try {
+    // Delete in order: tracking -> answers -> session
+    
+    // 1. Delete tracking data (non-critical)
+    await supabase
+      .from('test_session_tracking')
+      .delete()
+      .eq('session_id', sessionId);
+
+    // 2. Delete user answers
+    const { error: answersError } = await supabase
+      .from('user_answers')
+      .delete()
+      .eq('session_id', sessionId);
+
+    if (answersError) {
+      console.error('Error deleting answers:', answersError);
+      throw answersError;
+    }
+
+    // 3. Delete test session
+    const { error: sessionError } = await supabase
+      .from('test_sessions')
+      .delete()
+      .eq('id', sessionId);
+
+    if (sessionError) {
+      console.error('Error deleting session:', sessionError);
+      throw sessionError;
+    }
+
+    console.log('Test session deleted successfully');
+  } catch (error) {
+    console.error('Error in deleteTestSession:', error);
+    throw error;
+  }
+};
+
+export const checkIfTestSubmitted = async (sessionId: string): Promise<boolean> => {
+  console.log('Checking if test is submitted:', sessionId);
+  
+  const { data, error } = await supabase
     .from('test_sessions')
-    .select('*')
+    .select('is_submitted')
     .eq('id', sessionId)
     .single();
 
-  if (sessionError) {
-    console.error('Error fetching test session:', sessionError);
-    return null;
+  if (error) {
+    console.error('Error checking test submission status:', error);
+    return false;
   }
 
-  const { data: answers, error: answersError } = await supabase
-    .from('user_answers')
-    .select(`
-      *,
-      questions (
-        question_text,
-        correct_answer,
-        explanation,
-        options
-      )
-    `)
-    .eq('session_id', sessionId);
-
-  if (answersError) {
-    console.error('Error fetching answers:', answersError);
-    return { session, answers: [] };
-  }
-
-  return { session, answers: answers || [] };
+  return data?.is_submitted || false;
 };
