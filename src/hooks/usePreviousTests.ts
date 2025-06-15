@@ -138,11 +138,63 @@ export const usePreviousTests = () => {
   };
 
   const handleDeleteTest = async (testId: string) => {
+    if (!testId) {
+      console.error('No test ID provided for deletion');
+      toast({
+        title: "Error",
+        description: "Invalid test ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      console.log('Deleting test session:', testId);
+      console.log('Attempting to delete test session:', testId);
       
-      // Use the service function to properly delete the test session
-      await deleteTestSession(testId);
+      // Show loading state
+      const testToDelete = tests.find(test => test.id === testId);
+      if (!testToDelete) {
+        console.error('Test not found in local state');
+        toast({
+          title: "Error",
+          description: "Test not found.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // First, delete from tracking table
+      const { error: trackingError } = await supabase
+        .from('test_session_tracking')
+        .delete()
+        .eq('session_id', testId);
+
+      if (trackingError) {
+        console.error('Error deleting tracking data:', trackingError);
+        // Don't return here, continue with other deletions
+      }
+
+      // Then delete user answers
+      const { error: answersError } = await supabase
+        .from('user_answers')
+        .delete()
+        .eq('session_id', testId);
+
+      if (answersError) {
+        console.error('Error deleting user answers:', answersError);
+        throw answersError;
+      }
+
+      // Finally delete the test session
+      const { error: sessionError } = await supabase
+        .from('test_sessions')
+        .delete()
+        .eq('id', testId);
+
+      if (sessionError) {
+        console.error('Error deleting test session:', sessionError);
+        throw sessionError;
+      }
 
       // Update local state only after successful deletion
       setTests(prev => prev.filter(test => test.id !== testId));
@@ -157,7 +209,7 @@ export const usePreviousTests = () => {
       console.error('Error deleting test:', error);
       toast({
         title: "Error",
-        description: "Failed to delete test.",
+        description: "Failed to delete test. Please try again.",
         variant: "destructive",
       });
     }

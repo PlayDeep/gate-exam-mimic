@@ -185,7 +185,28 @@ export const getTestSessionDetails = async (sessionId: string) => {
 };
 
 export const deleteTestSession = async (sessionId: string): Promise<void> => {
-  // First delete related user_answers
+  if (!sessionId) {
+    throw new Error('Session ID is required');
+  }
+
+  console.log('Starting deletion process for session:', sessionId);
+
+  // Delete tracking data first (optional, won't fail if doesn't exist)
+  try {
+    const { error: trackingError } = await supabase
+      .from('test_session_tracking')
+      .delete()
+      .eq('session_id', sessionId);
+
+    if (trackingError) {
+      console.warn('Warning deleting tracking data:', trackingError);
+      // Don't throw, continue with other deletions
+    }
+  } catch (error) {
+    console.warn('Non-critical error deleting tracking data:', error);
+  }
+
+  // Delete user answers
   const { error: answersError } = await supabase
     .from('user_answers')
     .delete()
@@ -196,7 +217,7 @@ export const deleteTestSession = async (sessionId: string): Promise<void> => {
     throw answersError;
   }
 
-  // Then delete the test session
+  // Delete the test session
   const { error: sessionError } = await supabase
     .from('test_sessions')
     .delete()
@@ -206,4 +227,6 @@ export const deleteTestSession = async (sessionId: string): Promise<void> => {
     console.error('Error deleting test session:', sessionError);
     throw sessionError;
   }
+
+  console.log('Successfully deleted session:', sessionId);
 };
