@@ -41,12 +41,7 @@ const ScoreOverview = ({
   const totalAvailableTime = 180 * 60; // 3 hours in seconds
   const timeUtilization = Math.round((totalTimeSpent / totalAvailableTime) * 100);
   
-  // Time categories
-  const fastQuestions = answeredQuestions > 0 ? Math.round(answeredQuestions * 0.3) : 0;
-  const mediumQuestions = answeredQuestions > 0 ? Math.round(answeredQuestions * 0.5) : 0;
-  const slowQuestions = answeredQuestions - fastQuestions - mediumQuestions;
-
-  // Generate chart data
+  // Use real time data if available, otherwise generate chart data
   const chartData = questionTimeData.length > 0 
     ? questionTimeData.slice(0, 20).map(item => ({
         question: `Q${item.questionNumber}`,
@@ -56,6 +51,12 @@ const ScoreOverview = ({
         question: `Q${index + 1}`,
         timeSpent: answers[index + 1] ? Math.floor(Math.random() * 150) + 30 : 0
       }));
+
+  // Calculate time distribution from real data
+  const answeredQuestionsWithTime = questionTimeData.filter(q => answers[q.questionNumber]);
+  const fastQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent < 30).length;
+  const mediumQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent >= 30 && q.timeSpent <= 90).length;
+  const slowQuestions = answeredQuestionsWithTime.filter(q => q.timeSpent > 90).length;
 
   const chartConfig = {
     timeSpent: {
@@ -111,7 +112,7 @@ const ScoreOverview = ({
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Clock className="w-6 h-6 text-blue-500" />
-            <span>Time Analysis</span>
+            <span>Time Analysis {questionTimeData.length > 0 ? '(Real Data)' : '(Simulated)'}</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -199,20 +200,20 @@ const ScoreOverview = ({
               </div>
             </div>
             
-            {/* Time Distribution */}
+            {/* Time Distribution - Use real data if available */}
             <div className="space-y-3">
               <h4 className="font-medium text-gray-800">Time Distribution</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <div className="font-semibold text-green-600 text-xl">~{fastQuestions}</div>
+                  <div className="font-semibold text-green-600 text-xl">{fastQuestions}</div>
                   <div className="text-sm text-gray-600">Quick (&lt;30s)</div>
                 </div>
                 <div className="text-center">
-                  <div className="font-semibold text-yellow-600 text-xl">~{mediumQuestions}</div>
+                  <div className="font-semibold text-yellow-600 text-xl">{mediumQuestions}</div>
                   <div className="text-sm text-gray-600">Medium (30-90s)</div>
                 </div>
                 <div className="text-center">
-                  <div className="font-semibold text-red-600 text-xl">~{slowQuestions}</div>
+                  <div className="font-semibold text-red-600 text-xl">{slowQuestions}</div>
                   <div className="text-sm text-gray-600">Slow (&gt;90s)</div>
                 </div>
                 <div className="text-center">
@@ -235,6 +236,14 @@ const ScoreOverview = ({
               <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
                   <strong>Suggestion:</strong> Average {avgTimePerQuestion}s per question. Aim for 2-3 minutes per question for optimal time usage.
+                </p>
+              </div>
+            )}
+
+            {questionTimeData.length > 0 && (
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  <strong>Note:</strong> Time analysis is based on actual time spent on each question, including revisits.
                 </p>
               </div>
             )}

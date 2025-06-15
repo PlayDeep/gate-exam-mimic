@@ -15,6 +15,7 @@ import { Progress } from "@/components/ui/progress";
 import { getRandomQuestionsForTest, Question } from "@/services/questionService";
 import { createTestSession, updateTestSession, saveUserAnswer } from "@/services/testService";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuestionTimer } from "@/hooks/useQuestionTimer";
 
 const Exam = () => {
   const { subject } = useParams();
@@ -32,6 +33,9 @@ const Exam = () => {
   const [isLoading, setIsLoading] = useState(true);
   
   const totalQuestions = questions.length > 0 ? Math.min(questions.length, 65) : 0;
+
+  // Add timer hook
+  const { startTimer, stopTimer, getTimeSpent, getAllTimeData } = useQuestionTimer();
 
   // Check authentication
   useEffect(() => {
@@ -90,6 +94,13 @@ const Exam = () => {
     initializeTest();
   }, [subject, user, navigate, toast]);
 
+  // Start timer for first question when exam loads
+  useEffect(() => {
+    if (!isLoading && totalQuestions > 0) {
+      startTimer(currentQuestion);
+    }
+  }, [isLoading, totalQuestions, startTimer]);
+
   // Timer effect
   useEffect(() => {
     if (isLoading) return;
@@ -117,6 +128,13 @@ const Exam = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      stopTimer();
+    };
+  }, [stopTimer]);
+
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -132,7 +150,7 @@ const Exam = () => {
     
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     
-    // Save answer to database
+    // Save answer to database with actual time spent
     if (sessionId && questions[questionId - 1]) {
       const question = questions[questionId - 1];
       console.log('Question Data:', {
@@ -164,6 +182,10 @@ const Exam = () => {
       // NAT questions don't have negative marking
       
       console.log('Marks Awarded:', marksAwarded);
+      
+      // Get actual time spent on this question
+      const timeSpent = getTimeSpent(questionId);
+      console.log('Time Spent on Question:', timeSpent);
       console.log('=== ANSWER CHANGE END ===');
       
       try {
@@ -173,7 +195,7 @@ const Exam = () => {
           answer,
           isCorrect,
           marksAwarded,
-          30 // Default time spent, you can track this more accurately
+          timeSpent
         );
       } catch (error) {
         console.error('Error saving answer:', error);
@@ -195,6 +217,9 @@ const Exam = () => {
 
   const handleSubmitExam = async () => {
     if (!sessionId) return;
+    
+    // Stop current timer
+    stopTimer();
     
     try {
       const timeSpentMinutes = Math.floor((180 * 60 - timeLeft) / 60);
@@ -278,6 +303,9 @@ const Exam = () => {
         time_taken: timeSpentMinutes
       });
       
+      // Get all time data for results
+      const questionTimeData = getAllTimeData();
+      
       navigate('/results', { 
         state: { 
           sessionId,
@@ -286,7 +314,8 @@ const Exam = () => {
           timeSpent: timeSpentMinutes,
           subject,
           score: totalScore,
-          percentage: percentage
+          percentage: percentage,
+          questionTimeData: questionTimeData
         } 
       });
     } catch (error) {
@@ -335,6 +364,9 @@ const Exam = () => {
     if (!isLoading && totalQuestions > 0 && currentQuestion < totalQuestions) {
       const nextQuestion = currentQuestion + 1;
       console.log('Moving to question:', nextQuestion);
+      
+      // Start timer for next question
+      startTimer(nextQuestion);
       setCurrentQuestion(nextQuestion);
     } else {
       console.log('Cannot move to next question. Loading:', isLoading, 'Total:', totalQuestions, 'Current:', currentQuestion);
@@ -346,10 +378,21 @@ const Exam = () => {
     if (!isLoading && currentQuestion > 1) {
       const prevQuestion = currentQuestion - 1;
       console.log('Moving to question:', prevQuestion);
+      
+      // Start timer for previous question
+      startTimer(prevQuestion);
       setCurrentQuestion(prevQuestion);
     } else {
       console.log('Cannot move to previous question. Loading:', isLoading, 'Current:', currentQuestion);
     }
+  };
+
+  // Helper function to navigate to specific question
+  const navigateToQuestion = (questionNum: number) => {
+    console.log('Question grid clicked:', questionNum);
+    // Start timer for selected question
+    startTimer(questionNum);
+    setCurrentQuestion(questionNum);
   };
 
   // Helper function to parse options correctly
@@ -498,6 +541,9 @@ const Exam = () => {
                           </Badge>
                           <Badge variant="outline">
                             {currentQuestionData.subject}
+                          </Badge>
+                          <Badge variant="outline" className="bg-blue-50">
+                            Time: {Math.floor(getTimeSpent(currentQuestion) / 60)}m {getTimeSpent(currentQuestion) % 60}s
                           </Badge>
                         </div>
                         
@@ -680,10 +726,7 @@ const Exam = () => {
                 return (
                   <button
                     key={questionNum}
-                    onClick={() => {
-                      console.log('Question grid clicked:', questionNum);
-                      setCurrentQuestion(questionNum);
-                    }}
+                    onClick={() => navigateToQuestion(questionNum)}
                     className={`
                       w-10 h-10 rounded text-white text-sm font-medium
                       ${isCurrent ? 'ring-2 ring-gray-400' : ''}
