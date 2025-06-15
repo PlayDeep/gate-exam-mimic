@@ -42,31 +42,32 @@ const ScoreOverview = ({
   const timeUtilization = Math.round((totalTimeSpent / totalAvailableTime) * 100);
   
   // Time categories
-  const fastQuestions = answeredQuestions > 0 ? Math.round(answeredQuestions * 0.3) : 0; // Assuming 30% were answered quickly
-  const mediumQuestions = answeredQuestions > 0 ? Math.round(answeredQuestions * 0.5) : 0; // 50% medium time
+  const fastQuestions = answeredQuestions > 0 ? Math.round(answeredQuestions * 0.3) : 0;
+  const mediumQuestions = answeredQuestions > 0 ? Math.round(answeredQuestions * 0.5) : 0;
   const slowQuestions = answeredQuestions - fastQuestions - mediumQuestions;
 
-  // Generate chart data - if no specific time data provided, create sample data based on average
+  // Generate chart data
   const chartData = questionTimeData.length > 0 
-    ? questionTimeData.map(item => ({
+    ? questionTimeData.slice(0, 20).map(item => ({
         question: `Q${item.questionNumber}`,
         timeSpent: item.timeSpent
       }))
-    : Array.from({ length: totalQuestions }, (_, index) => ({
+    : Array.from({ length: Math.min(totalQuestions, 20) }, (_, index) => ({
         question: `Q${index + 1}`,
-        timeSpent: answers[index + 1] ? Math.floor(Math.random() * 180) + 30 : 0 // Random time for answered questions
+        timeSpent: answers[index + 1] ? Math.floor(Math.random() * 150) + 30 : 0
       }));
 
   const chartConfig = {
     timeSpent: {
-      label: "Time Spent (seconds)",
-      color: "hsl(var(--chart-1))",
+      label: "Time Spent",
+      color: "hsl(217, 91%, 60%)",
     },
   };
 
   return (
     <div className="space-y-6 mb-8">
-      <Card>
+      {/* Overall Performance Card */}
+      <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Trophy className="w-6 h-6 text-yellow-500" />
@@ -74,7 +75,7 @@ const ScoreOverview = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div className="text-center">
               <div className="text-4xl font-bold text-gray-900 mb-2">
                 {score}/{maxScore}
@@ -105,38 +106,42 @@ const ScoreOverview = ({
         </CardContent>
       </Card>
 
-      <Card>
+      {/* Time Analysis Card */}
+      <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Clock className="w-6 h-6 text-blue-500" />
-            <span>Detailed Time Analysis</span>
+            <span>Time Analysis</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
             {/* Time Chart */}
             <div className="w-full">
-              <h4 className="font-medium text-gray-800 mb-3">Time per Question</h4>
-              <div className="h-80 w-full">
-                <ChartContainer config={chartConfig}>
+              <h4 className="font-medium text-gray-800 mb-4">Time per Question (First 20 Questions)</h4>
+              <div className="w-full h-64">
+                <ChartContainer config={chartConfig} className="w-full h-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <BarChart 
+                      data={chartData} 
+                      margin={{ top: 10, right: 10, left: 10, bottom: 40 }}
+                    >
                       <XAxis 
                         dataKey="question" 
-                        tick={{ fontSize: 12 }}
-                        interval={Math.max(0, Math.floor(totalQuestions / 15))}
+                        tick={{ fontSize: 11 }}
                         angle={-45}
                         textAnchor="end"
-                        height={60}
+                        height={50}
+                        interval={0}
                       />
                       <YAxis 
-                        tick={{ fontSize: 12 }}
-                        label={{ value: 'Time (seconds)', angle: -90, position: 'insideLeft' }}
-                        width={60}
+                        tick={{ fontSize: 11 }}
+                        width={40}
                       />
                       <ChartTooltip 
                         content={<ChartTooltipContent />}
-                        formatter={(value: any) => [`${value}s`, "Time Spent"]}
+                        formatter={(value: number) => [`${value}s`, "Time Spent"]}
+                        labelFormatter={(label) => `Question ${label.replace('Q', '')}`}
                       />
                       <Bar 
                         dataKey="timeSpent" 
@@ -150,30 +155,32 @@ const ScoreOverview = ({
             </div>
 
             {/* Summary Statistics */}
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Total Time:</span>
-                <span className="font-semibold">{timeSpentFormatted}</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-800">Time Summary</h4>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Total Time:</span>
+                  <span className="font-semibold">{timeSpentFormatted}</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Time Remaining:</span>
+                  <span className="font-semibold text-green-600">
+                    {Math.floor((totalAvailableTime - totalTimeSpent) / 60)}m {(totalAvailableTime - totalTimeSpent) % 60}s
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Time Utilization:</span>
+                  <span className={`font-semibold ${timeUtilization > 90 ? 'text-red-500' : timeUtilization > 70 ? 'text-yellow-500' : 'text-green-500'}`}>
+                    {timeUtilization}%
+                  </span>
+                </div>
               </div>
               
-              <div className="flex justify-between">
-                <span className="text-gray-600">Time Remaining:</span>
-                <span className="font-semibold text-green-600">
-                  {Math.floor((totalAvailableTime - totalTimeSpent) / 60)}m {(totalAvailableTime - totalTimeSpent) % 60}s
-                </span>
-              </div>
-              
-              <div className="flex justify-between">
-                <span className="text-gray-600">Time Utilization:</span>
-                <span className={`font-semibold ${timeUtilization > 90 ? 'text-red-500' : timeUtilization > 70 ? 'text-yellow-500' : 'text-green-500'}`}>
-                  {timeUtilization}%
-                </span>
-              </div>
-              
-              <hr className="my-3" />
-              
-              <div className="space-y-2">
-                <h4 className="font-medium text-gray-800">Per Question Analysis</h4>
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-800">Question Analysis</h4>
                 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Avg per Question:</span>
@@ -190,49 +197,47 @@ const ScoreOverview = ({
                   <span className="font-semibold">{answeredQuestions}/{totalQuestions}</span>
                 </div>
               </div>
-              
-              <hr className="my-3" />
-              
-              <div className="space-y-2">
-                <h4 className="font-medium text-gray-800">Time Distribution</h4>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Quick (&lt;30s):</span>
-                  <span className="font-semibold text-green-600">~{fastQuestions}</span>
+            </div>
+            
+            {/* Time Distribution */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-gray-800">Time Distribution</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="font-semibold text-green-600 text-xl">~{fastQuestions}</div>
+                  <div className="text-sm text-gray-600">Quick (&lt;30s)</div>
                 </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Medium (30-90s):</span>
-                  <span className="font-semibold text-yellow-600">~{mediumQuestions}</span>
+                <div className="text-center">
+                  <div className="font-semibold text-yellow-600 text-xl">~{mediumQuestions}</div>
+                  <div className="text-sm text-gray-600">Medium (30-90s)</div>
                 </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Slow (&gt;90s):</span>
-                  <span className="font-semibold text-red-600">~{slowQuestions}</span>
+                <div className="text-center">
+                  <div className="font-semibold text-red-600 text-xl">~{slowQuestions}</div>
+                  <div className="text-sm text-gray-600">Slow (&gt;90s)</div>
                 </div>
-                
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Unanswered:</span>
-                  <span className="font-semibold text-gray-500">{unansweredQuestions}</span>
+                <div className="text-center">
+                  <div className="font-semibold text-gray-500 text-xl">{unansweredQuestions}</div>
+                  <div className="text-sm text-gray-600">Unanswered</div>
                 </div>
               </div>
-              
-              {timeUtilization > 85 && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Tip:</strong> You used {timeUtilization}% of available time. Consider time management strategies for better performance.
-                  </p>
-                </div>
-              )}
-              
-              {avgTimePerQuestion > 120 && (
-                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-800">
-                    <strong>Suggestion:</strong> Average {avgTimePerQuestion}s per question. Aim for 2-3 minutes per question for optimal time usage.
-                  </p>
-                </div>
-              )}
             </div>
+            
+            {/* Performance Tips */}
+            {timeUtilization > 85 && (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  <strong>Tip:</strong> You used {timeUtilization}% of available time. Consider time management strategies for better performance.
+                </p>
+              </div>
+            )}
+            
+            {avgTimePerQuestion > 120 && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Suggestion:</strong> Average {avgTimePerQuestion}s per question. Aim for 2-3 minutes per question for optimal time usage.
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
