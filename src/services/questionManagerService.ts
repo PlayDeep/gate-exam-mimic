@@ -160,44 +160,67 @@ export const submitQuestion = async (formData: FormData, editingQuestion: Questi
 };
 
 export const deleteQuestion = async (id: string): Promise<void> => {
-  console.log('questionManagerService: Deleting question with id:', id);
+  console.log('questionManagerService: Starting deletion process for question:', id);
   
-  // First, delete all user answers for this specific question to avoid foreign key constraint violation
-  console.log('questionManagerService: Deleting user answers for question:', id);
-  const { error: answersError } = await supabase
-    .from('user_answers')
-    .delete()
-    .eq('question_id', id);
+  try {
+    // First, check if there are any user answers for this question
+    console.log('questionManagerService: Checking for user answers for question:', id);
+    const { data: userAnswers, error: checkError } = await supabase
+      .from('user_answers')
+      .select('id')
+      .eq('question_id', id);
 
-  if (answersError) {
-    console.error('questionManagerService: Error deleting user answers for question:', answersError);
+    if (checkError) {
+      console.error('questionManagerService: Error checking user answers:', checkError);
+      throw checkError;
+    }
+
+    console.log('questionManagerService: Found', userAnswers?.length || 0, 'user answers for question:', id);
+
+    // Delete all user answers for this specific question if any exist
+    if (userAnswers && userAnswers.length > 0) {
+      console.log('questionManagerService: Deleting', userAnswers.length, 'user answers for question:', id);
+      const { error: answersError } = await supabase
+        .from('user_answers')
+        .delete()
+        .eq('question_id', id);
+
+      if (answersError) {
+        console.error('questionManagerService: Error deleting user answers for question:', answersError);
+        toast({
+          title: "Error",
+          description: `Failed to delete related user answers: ${answersError.message}`,
+          variant: "destructive"
+        });
+        throw answersError;
+      }
+      console.log('questionManagerService: Successfully deleted user answers for question:', id);
+    }
+
+    // Now delete the question
+    console.log('questionManagerService: Deleting question:', id);
+    const { error: questionError } = await supabase
+      .from('questions')
+      .delete()
+      .eq('id', id);
+
+    if (questionError) {
+      console.error('questionManagerService: Error deleting question:', questionError);
+      toast({
+        title: "Error",
+        description: `Failed to delete question: ${questionError.message}`,
+        variant: "destructive"
+      });
+      throw questionError;
+    }
+
+    console.log('questionManagerService: Successfully deleted question:', id);
     toast({
-      title: "Error",
-      description: `Failed to delete related user answers: ${answersError.message}`,
-      variant: "destructive"
+      title: "Success",
+      description: "Question and related data deleted successfully!"
     });
-    throw answersError;
-  }
-
-  // Then delete the question
-  console.log('questionManagerService: Deleting question:', id);
-  const { error } = await supabase
-    .from('questions')
-    .delete()
-    .eq('id', id);
-
-  if (error) {
-    console.error('questionManagerService: Error deleting question:', error);
-    toast({
-      title: "Error",
-      description: `Failed to delete question: ${error.message}`,
-      variant: "destructive"
-    });
+  } catch (error) {
+    console.error('questionManagerService: Unexpected error in deleteQuestion:', error);
     throw error;
   }
-
-  toast({
-    title: "Success",
-    description: "Question and related data deleted successfully!"
-  });
 };
