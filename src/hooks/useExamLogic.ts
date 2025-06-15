@@ -271,12 +271,25 @@ export const useExamLogic = ({
     console.log('=== SUBMIT EXAM START ===');
     console.log('Session ID:', sessionId);
     console.log('Is Submitting:', isSubmitting);
+    console.log('User:', user?.id);
+    console.log('Questions length:', questions.length);
+    console.log('Answers count:', Object.keys(answers).length);
     
     if (!sessionId) {
       console.error('No session ID found');
       toast({
         title: "Error",
         description: "No active session found. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!user) {
+      console.error('No user found');
+      toast({
+        title: "Error",
+        description: "Authentication required. Please log in again.",
         variant: "destructive",
       });
       return;
@@ -366,6 +379,14 @@ export const useExamLogic = ({
       
       // Submit test session with timestamp
       console.log('Submitting test session...');
+      console.log('Submission data:', {
+        end_time: new Date().toISOString(),
+        answered_questions: answeredCount,
+        score: totalScore,
+        percentage: percentage,
+        time_taken: timeSpentMinutes
+      });
+      
       await submitTestSession(sessionId, {
         end_time: new Date().toISOString(),
         answered_questions: answeredCount,
@@ -385,6 +406,7 @@ export const useExamLogic = ({
         description: "Your test has been submitted successfully!",
       });
       
+      console.log('Navigating to results...');
       navigate('/results', { 
         state: { 
           sessionId,
@@ -401,13 +423,17 @@ export const useExamLogic = ({
       console.log('=== SUBMIT EXAM SUCCESS ===');
     } catch (error) {
       console.error('Error submitting exam:', error);
+      console.error('Error details:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      
       toast({
         title: "Error",
-        description: "Failed to submit exam. Please try again.",
+        description: `Failed to submit exam: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`,
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
+      console.log('=== SUBMIT EXAM END ===');
     }
   };
 
