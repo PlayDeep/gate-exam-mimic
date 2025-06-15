@@ -9,6 +9,17 @@ interface UseRealTimeTrackingProps {
   isActive: boolean;
 }
 
+interface TestSessionPayload {
+  new?: {
+    is_submitted?: boolean;
+    [key: string]: any;
+  };
+  old?: {
+    is_submitted?: boolean;
+    [key: string]: any;
+  };
+}
+
 export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTrackingProps) => {
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -33,11 +44,11 @@ export const useRealTimeTracking = ({ sessionId, isActive }: UseRealTimeTracking
           table: 'test_sessions',
           filter: `id=eq.${sessionId}`
         },
-        (payload) => {
+        (payload: TestSessionPayload) => {
           console.log('Test session change:', payload);
           
           // Check if session was force-submitted by admin
-          if (payload.new && payload.new.is_submitted && !payload.old?.is_submitted) {
+          if (payload.new?.is_submitted && !payload.old?.is_submitted) {
             console.log('Session was submitted by admin');
             // Could show a notification or redirect user
           }

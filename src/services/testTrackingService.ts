@@ -62,5 +62,13 @@ export const getSessionActivity = async (sessionId: string): Promise<SessionActi
     return [];
   }
 
-  return data || [];
+  return (data || []).map(item => ({
+    id: item.id,
+    session_id: item.session_id || '',
+    user_id: item.user_id,
+    activity_type: item.activity_type as SessionActivity['activity_type'],
+    question_number: item.question_number || undefined,
+    timestamp: item.timestamp,
+    metadata: item.metadata
+  }));
 };
