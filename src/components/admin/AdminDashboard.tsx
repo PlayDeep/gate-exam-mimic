@@ -1,36 +1,83 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Users, FileQuestion, BarChart3, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import QuestionManager from './QuestionManager';
 import UserManager from './UserManager';
 import TestAnalytics from './TestAnalytics';
 
 const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    totalQuestions: 0,
+    testsCompleted: 0
+  });
   const navigate = useNavigate();
 
-  const stats = [
+  useEffect(() => {
+    fetchDashboardStats();
+  }, []);
+
+  const fetchDashboardStats = async () => {
+    try {
+      console.log('Fetching dashboard stats...');
+      
+      // Fetch users count
+      const { data: users, error: usersError } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true });
+
+      // Fetch questions count
+      const { data: questions, error: questionsError } = await supabase
+        .from('questions')
+        .select('id', { count: 'exact', head: true });
+
+      // Fetch completed tests count
+      const { data: completedTests, error: testsError } = await supabase
+        .from('test_sessions')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'completed');
+
+      if (usersError) console.error('Error fetching users:', usersError);
+      if (questionsError) console.error('Error fetching questions:', questionsError);
+      if (testsError) console.error('Error fetching tests:', testsError);
+
+      const newStats = {
+        totalUsers: users?.length || 0,
+        totalQuestions: questions?.length || 0,
+        testsCompleted: completedTests?.length || 0
+      };
+
+      console.log('Dashboard stats:', newStats);
+      setStats(newStats);
+    } catch (error) {
+      console.error('Error fetching dashboard stats:', error);
+    }
+  };
+
+  const statsCards = [
     {
       title: "Total Users",
-      value: "0",
+      value: stats.totalUsers.toString(),
       description: "Registered users",
       icon: Users,
       color: "text-blue-600"
     },
     {
       title: "Total Questions",
-      value: "0",
+      value: stats.totalQuestions.toString(),
       description: "Questions in database",
       icon: FileQuestion,
       color: "text-green-600"
     },
     {
-      title: "Tests Taken",
-      value: "0",
+      title: "Tests Completed",
+      value: stats.testsCompleted.toString(),
       description: "Completed tests",
       icon: BarChart3,
       color: "text-purple-600"
@@ -67,7 +114,7 @@ const AdminDashboard: React.FC = () => {
 
           <TabsContent value="overview" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {stats.map((stat, index) => (
+              {statsCards.map((stat, index) => (
                 <Card key={index}>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
@@ -121,7 +168,12 @@ const AdminDashboard: React.FC = () => {
                   <CardDescription>Latest system activity</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm text-gray-500">No recent activity</p>
+                  <p className="text-sm text-gray-500">
+                    {stats.testsCompleted > 0 
+                      ? `${stats.testsCompleted} tests completed by ${stats.totalUsers} users`
+                      : 'No recent activity'
+                    }
+                  </p>
                 </CardContent>
               </Card>
             </div>

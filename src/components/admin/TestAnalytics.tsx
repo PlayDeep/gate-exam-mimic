@@ -47,6 +47,8 @@ const TestAnalytics: React.FC = () => {
   const fetchComprehensiveAnalytics = async () => {
     setLoading(true);
     try {
+      console.log('Fetching comprehensive analytics...');
+      
       // Fetch basic analytics
       const { data: sessions } = await supabase
         .from('test_sessions')
@@ -55,6 +57,9 @@ const TestAnalytics: React.FC = () => {
       const { data: users } = await supabase
         .from('profiles')
         .select('*');
+
+      console.log('Sessions data:', sessions?.length || 0);
+      console.log('Users data:', users?.length || 0);
 
       // Calculate basic metrics
       if (sessions && users) {
@@ -66,14 +71,17 @@ const TestAnalytics: React.FC = () => {
         const totalTimeSpent = completedSessions.reduce((sum, s) => sum + (s.time_taken || 0), 0);
         const avgTestDuration = completedSessions.length > 0 ? totalTimeSpent / completedSessions.length : 0;
 
-        setAnalytics({
+        const newAnalytics = {
           totalTests: sessions.length,
           totalUsers: users.length,
           avgScore: Math.round(avgScore * 10) / 10,
           completionRate: sessions.length > 0 ? Math.round((completedSessions.length / sessions.length) * 100) : 0,
           totalTimeSpent: Math.round(totalTimeSpent / 60), // Convert to minutes
           avgTestDuration: Math.round(avgTestDuration / 60) // Convert to minutes
-        });
+        };
+
+        console.log('Calculated analytics:', newAnalytics);
+        setAnalytics(newAnalytics);
       }
 
       // Fetch user performance data
@@ -93,6 +101,8 @@ const TestAnalytics: React.FC = () => {
   };
 
   const fetchUserPerformance = async () => {
+    console.log('Fetching user performance...');
+    
     const { data, error } = await supabase
       .from('test_sessions')
       .select(`
@@ -111,6 +121,8 @@ const TestAnalytics: React.FC = () => {
       console.error('Error fetching user performance:', error);
       return;
     }
+
+    console.log('User performance data:', data?.length || 0, 'sessions');
 
     // Group by user and calculate metrics
     const userStats: { [key: string]: any } = {};
@@ -146,10 +158,13 @@ const TestAnalytics: React.FC = () => {
       completion_rate: 100 // All selected sessions are completed
     })).sort((a, b) => b.best_score - a.best_score);
 
+    console.log('Processed user performance:', performanceData.length, 'users');
     setUserPerformance(performanceData);
   };
 
   const fetchSubjectAnalytics = async () => {
+    console.log('Fetching subject analytics...');
+    
     const { data, error } = await supabase
       .from('test_sessions')
       .select('subject, percentage, status, user_id');
@@ -158,6 +173,8 @@ const TestAnalytics: React.FC = () => {
       console.error('Error fetching subject analytics:', error);
       return;
     }
+
+    console.log('Subject analytics data:', data?.length || 0, 'sessions');
 
     // Group by subject
     const subjectStats: { [key: string]: any } = {};
@@ -193,10 +210,13 @@ const TestAnalytics: React.FC = () => {
       };
     });
 
+    console.log('Processed subject analytics:', subjectData.length, 'subjects');
     setSubjectAnalytics(subjectData);
   };
 
   const fetchRecentActivity = async () => {
+    console.log('Fetching recent activity...');
+    
     const { data, error } = await supabase
       .from('test_sessions')
       .select(`
@@ -219,6 +239,7 @@ const TestAnalytics: React.FC = () => {
       return;
     }
 
+    console.log('Recent activity data:', data?.length || 0, 'activities');
     setRecentActivity(data || []);
   };
 
