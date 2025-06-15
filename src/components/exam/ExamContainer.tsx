@@ -1,5 +1,4 @@
-
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useSimpleExamState } from "@/hooks/useSimpleExamState";
 import { useExamTimer } from "@/hooks/useExamTimer";
 import { useSimpleExamSubmission } from "@/hooks/useSimpleExamSubmission";
