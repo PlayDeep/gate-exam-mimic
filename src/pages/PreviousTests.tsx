@@ -54,9 +54,12 @@ const PreviousTests = () => {
 
   const handleViewDetails = async (testId: string) => {
     try {
+      console.log('Loading test details for:', testId);
       const sessionDetails = await getTestSessionDetails(testId);
+      console.log('Session details:', sessionDetails);
       
       if (!sessionDetails || !sessionDetails.session) {
+        console.error('No session details found');
         toast({
           title: "Error",
           description: "Could not load test details.",
@@ -66,6 +69,8 @@ const PreviousTests = () => {
       }
 
       const { session, answers } = sessionDetails;
+      console.log('Session:', session);
+      console.log('Answers:', answers);
       
       // Get questions for this test based on the subject
       const { data: questions, error } = await supabase
@@ -84,19 +89,42 @@ const PreviousTests = () => {
         return;
       }
 
+      console.log('Questions fetched:', questions);
+
+      if (!questions || questions.length === 0) {
+        toast({
+          title: "Error",
+          description: "No questions found for this test.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create a map of question IDs to question indices for proper mapping
+      const questionIdToIndex: Record<string, number> = {};
+      questions.forEach((question, index) => {
+        questionIdToIndex[question.id] = index + 1;
+      });
+
       // Convert answers to the format expected by Results page
       const answersMap: Record<number, string> = {};
-      answers.forEach((answer: any, index: number) => {
-        if (answer.user_answer) {
-          answersMap[index + 1] = answer.user_answer;
+      answers.forEach((answer: any) => {
+        if (answer.user_answer && answer.question_id) {
+          const questionIndex = questionIdToIndex[answer.question_id];
+          if (questionIndex) {
+            answersMap[questionIndex] = answer.user_answer;
+          }
         }
       });
+
+      console.log('Answers map:', answersMap);
+      console.log('Questions for results:', questions);
 
       // Navigate to results with the proper data structure
       navigate('/results', {
         state: {
           answers: answersMap,
-          questions: questions || [],
+          questions: questions,
           timeSpent: session.time_taken || 0,
           subject: session.subject,
           score: session.score,
