@@ -5,8 +5,12 @@ import { useExamNavigationHandler } from "@/hooks/useExamNavigationHandler";
 import { useExamFullscreen } from "@/hooks/useExamFullscreen";
 import { useExamContainerState } from "@/hooks/useExamContainerState";
 import { useExamSubmissionHandler } from "@/hooks/useExamSubmissionHandler";
+import { useKeyboardNavigation } from "@/hooks/useKeyboardNavigation";
+import { useTimeWarnings } from "@/hooks/useTimeWarnings";
+import { useConfirmationDialogs } from "@/hooks/useConfirmationDialogs";
 import ExamLoadingState from "./ExamLoadingState";
 import ExamContainerLayout from "./ExamContainerLayout";
+import ConfirmationDialog from "./ConfirmationDialog";
 import { Question } from "@/services/questionService";
 
 interface ExamContainerProps {
@@ -97,14 +101,49 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
   const { toggleFullscreen } = useExamFullscreen({ setIsFullscreen });
 
+  const { dialogs, showDialog, hideDialog } = useConfirmationDialogs();
+
+  // Time warnings hook
+  useTimeWarnings({
+    timeLeft,
+    isLoading,
+    isSubmitting: submissionInProgress
+  });
+
+  // Keyboard navigation hook
+  useKeyboardNavigation({
+    currentQuestion,
+    totalQuestions,
+    isLoading,
+    isSubmitting: submissionInProgress,
+    onNext: handleNext,
+    onPrevious: handlePrevious,
+    onMarkForReview: handleMarkForReview,
+    onClearResponse: () => showDialog('clearAnswer')
+  });
+
   // Create a wrapper function for clearing the current question's answer
   const handleClearResponse = () => {
+    showDialog('clearAnswer');
+  };
+
+  const confirmClearAnswer = () => {
     clearAnswer(currentQuestion);
+    hideDialog('clearAnswer');
   };
 
   // Create a wrapper function for marking the current question for review
   const handleMarkForReview = () => {
     toggleMarkForReview(currentQuestion);
+  };
+
+  const handleSubmitExam = () => {
+    showDialog('submitExam');
+  };
+
+  const confirmSubmitExam = () => {
+    hideDialog('submitExam');
+    handleSubmit();
   };
 
   // Loading state
@@ -126,28 +165,52 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   });
 
   return (
-    <ExamContainerLayout
-      subject={subject}
-      currentQuestion={currentQuestion}
-      totalQuestions={totalQuestions}
-      timeLeft={timeLeft}
-      isFullscreen={isFullscreen}
-      onToggleFullscreen={toggleFullscreen}
-      onSubmitExam={handleSubmit}
-      submissionInProgress={submissionInProgress}
-      currentQuestionData={currentQuestionData}
-      answers={answers}
-      isLoading={isLoading}
-      markedForReview={markedForReview}
-      onAnswerChange={handleAnswerChange}
-      onMarkForReview={handleMarkForReview}
-      onClearResponse={handleClearResponse}
-      onNext={handleNext}
-      onPrevious={handlePrevious}
-      answeredCount={answeredCount}
-      markedCount={markedCount}
-      onNavigateToQuestion={handleQuestionNavigation}
-    />
+    <>
+      <ExamContainerLayout
+        subject={subject}
+        currentQuestion={currentQuestion}
+        totalQuestions={totalQuestions}
+        timeLeft={timeLeft}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onSubmitExam={handleSubmitExam}
+        submissionInProgress={submissionInProgress}
+        currentQuestionData={currentQuestionData}
+        answers={answers}
+        isLoading={isLoading}
+        markedForReview={markedForReview}
+        onAnswerChange={handleAnswerChange}
+        onMarkForReview={handleMarkForReview}
+        onClearResponse={handleClearResponse}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+        answeredCount={answeredCount}
+        markedCount={markedCount}
+        onNavigateToQuestion={handleQuestionNavigation}
+      />
+
+      {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        isOpen={dialogs.clearAnswer}
+        onClose={() => hideDialog('clearAnswer')}
+        onConfirm={confirmClearAnswer}
+        title="Clear Answer"
+        description="Are you sure you want to clear your answer for this question?"
+        confirmText="Clear"
+        cancelText="Cancel"
+      />
+
+      <ConfirmationDialog
+        isOpen={dialogs.submitExam}
+        onClose={() => hideDialog('submitExam')}
+        onConfirm={confirmSubmitExam}
+        title="Submit Exam"
+        description={`Are you sure you want to submit your exam? You have answered ${answeredCount} out of ${totalQuestions} questions. This action cannot be undone.`}
+        confirmText="Submit Exam"
+        cancelText="Continue Exam"
+        variant="destructive"
+      />
+    </>
   );
 };
 
