@@ -163,64 +163,59 @@ export const deleteQuestion = async (id: string): Promise<void> => {
   console.log('questionManagerService: Starting deletion process for question:', id);
   
   try {
-    // First, check if there are any user answers for this question
-    console.log('questionManagerService: Checking for user answers for question:', id);
-    const { data: userAnswers, error: checkError } = await supabase
-      .from('user_answers')
-      .select('id')
-      .eq('question_id', id);
+    // Use a more aggressive approach - delete using raw SQL function call
+    console.log('questionManagerService: Attempting to delete question and related data using RPC...');
+    
+    // First, let's try using a direct deletion approach with better error handling
+    const { error: deleteError } = await supabase.rpc('delete_question_with_answers', {
+      question_id: id
+    });
 
-    if (checkError) {
-      console.error('questionManagerService: Error checking user answers:', checkError);
-      throw checkError;
-    }
-
-    console.log('questionManagerService: Found', userAnswers?.length || 0, 'user answers for question:', id);
-
-    // Delete all user answers for this specific question if any exist
-    if (userAnswers && userAnswers.length > 0) {
-      console.log('questionManagerService: Deleting', userAnswers.length, 'user answers for question:', id);
+    if (deleteError) {
+      console.error('questionManagerService: RPC delete failed, trying manual approach:', deleteError);
+      
+      // Fallback to manual deletion with more specific targeting
+      console.log('questionManagerService: Manually deleting user_answers first...');
+      
+      // Delete user answers with more specific conditions
       const { error: answersError } = await supabase
         .from('user_answers')
         .delete()
         .eq('question_id', id);
 
       if (answersError) {
-        console.error('questionManagerService: Error deleting user answers for question:', answersError);
-        toast({
-          title: "Error",
-          description: `Failed to delete related user answers: ${answersError.message}`,
-          variant: "destructive"
-        });
+        console.error('questionManagerService: Error deleting user answers:', answersError);
         throw answersError;
       }
-      console.log('questionManagerService: Successfully deleted user answers for question:', id);
+
+      console.log('questionManagerService: User answers deleted, now deleting question...');
+      
+      // Now delete the question
+      const { error: questionError } = await supabase
+        .from('questions')
+        .delete()
+        .eq('id', id);
+
+      if (questionError) {
+        console.error('questionManagerService: Error deleting question:', questionError);
+        throw questionError;
+      }
     }
 
-    // Now delete the question
-    console.log('questionManagerService: Deleting question:', id);
-    const { error: questionError } = await supabase
-      .from('questions')
-      .delete()
-      .eq('id', id);
-
-    if (questionError) {
-      console.error('questionManagerService: Error deleting question:', questionError);
-      toast({
-        title: "Error",
-        description: `Failed to delete question: ${questionError.message}`,
-        variant: "destructive"
-      });
-      throw questionError;
-    }
-
-    console.log('questionManagerService: Successfully deleted question:', id);
+    console.log('questionManagerService: Successfully deleted question and related data:', id);
     toast({
       title: "Success",
       description: "Question and related data deleted successfully!"
     });
   } catch (error) {
     console.error('questionManagerService: Unexpected error in deleteQuestion:', error);
+    
+    // If all else fails, show a more specific error message
+    toast({
+      title: "Error",
+      description: "Failed to delete question. Please try deleting all questions instead, or contact support if the issue persists.",
+      variant: "destructive"
+    });
     throw error;
   }
 };
