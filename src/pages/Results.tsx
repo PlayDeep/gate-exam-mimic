@@ -26,94 +26,102 @@ const Results = () => {
   const navigate = useNavigate();
   const [resultsData, setResultsData] = useState<ResultsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     console.log('Results page mounted');
     console.log('Location state:', location.state);
 
     const loadResultsData = () => {
-      // Try to get data from location.state first (direct navigation from exam)
-      let data = location.state;
-      
-      // If no data in location.state, try sessionStorage
-      if (!data?.answers || !data?.questions) {
-        console.log('No data in location.state, checking sessionStorage...');
-        const storedData = sessionStorage.getItem('examResults');
-        if (storedData) {
-          try {
-            data = JSON.parse(storedData);
-            console.log('Found data in sessionStorage:', data);
-            // Clear the session storage after using it
-            sessionStorage.removeItem('examResults');
-          } catch (error) {
-            console.error('Failed to parse stored exam results:', error);
+      try {
+        // Primary: Try location.state (direct navigation from exam)
+        let data = location.state;
+        
+        // Fallback: Try sessionStorage
+        if (!data?.answers || !data?.questions) {
+          console.log('No valid data in location.state, checking sessionStorage...');
+          const storedData = sessionStorage.getItem('examResults');
+          if (storedData) {
+            try {
+              data = JSON.parse(storedData);
+              console.log('Found data in sessionStorage:', data);
+              // Clear sessionStorage after successful use
+              sessionStorage.removeItem('examResults');
+            } catch (error) {
+              console.error('Failed to parse stored exam results:', error);
+              setError('Failed to load stored results');
+            }
           }
         }
+
+        // Validate essential data
+        if (!data?.answers || !data?.questions || !Array.isArray(data.questions)) {
+          console.error('Missing or invalid required results data:', data);
+          setError('Invalid or missing exam results data');
+          setIsLoading(false);
+          return;
+        }
+
+        // Ensure data integrity
+        const answers = typeof data.answers === 'object' && data.answers !== null ? data.answers : {};
+        const questions = Array.isArray(data.questions) ? data.questions : [];
+        
+        if (questions.length === 0) {
+          console.error('No questions in results data');
+          setError('No questions found in results');
+          setIsLoading(false);
+          return;
+        }
+
+        // Calculate time spent with proper fallback
+        let timeSpent = 0;
+        if (typeof data.timeTaken === 'number') {
+          timeSpent = data.timeTaken; // This is in minutes from submission
+        } else if (typeof data.timeSpent === 'number') {
+          timeSpent = data.timeSpent; // Fallback for backward compatibility
+        }
+
+        // Validate and prepare question time data
+        let questionTimeData: Array<{ questionNumber: number; timeSpent: number }> = [];
+        if (data.questionTimeData && Array.isArray(data.questionTimeData)) {
+          questionTimeData = data.questionTimeData.filter(item => 
+            typeof item === 'object' && 
+            item !== null &&
+            typeof item.questionNumber === 'number' && 
+            typeof item.timeSpent === 'number'
+          );
+        }
+
+        const finalResultsData: ResultsData = {
+          sessionId: data.sessionId,
+          score: typeof data.score === 'number' ? data.score : undefined,
+          maxScore: typeof data.maxScore === 'number' ? data.maxScore : undefined,
+          percentage: typeof data.percentage === 'number' ? data.percentage : undefined,
+          answeredQuestions: typeof data.answeredQuestions === 'number' ? data.answeredQuestions : Object.keys(answers).length,
+          totalQuestions: typeof data.totalQuestions === 'number' ? data.totalQuestions : questions.length,
+          timeTaken: typeof data.timeTaken === 'number' ? data.timeTaken : undefined,
+          timeSpent: typeof data.timeSpent === 'number' ? data.timeSpent : undefined,
+          answers,
+          questions,
+          subject: typeof data.subject === 'string' ? data.subject : 'Unknown',
+          questionTimeData
+        };
+
+        console.log('Final results data prepared:', finalResultsData);
+        setResultsData(finalResultsData);
+        setError(null);
+      } catch (error) {
+        console.error('Error loading results data:', error);
+        setError('Failed to load exam results');
+      } finally {
+        setIsLoading(false);
       }
-
-      // Validate we have the minimum required data
-      if (!data?.answers || !data?.questions || !Array.isArray(data.questions)) {
-        console.error('Missing required results data:', data);
-        navigate('/', { replace: true });
-        return;
-      }
-
-      console.log('Valid results data found:', {
-        questionsCount: data.questions.length,
-        answersCount: Object.keys(data.answers || {}).length,
-        subject: data.subject,
-        score: data.score,
-        percentage: data.percentage
-      });
-
-      // Ensure we have a subject
-      const subject = data.subject || 'Unknown';
-      
-      // Ensure answers is an object and questions is an array
-      const answers = typeof data.answers === 'object' ? data.answers : {};
-      const questions = Array.isArray(data.questions) ? data.questions : [];
-      
-      // Calculate time spent - prioritize timeTaken from submission, then timeSpent from state
-      let timeSpent = 0;
-      if (data.timeTaken !== undefined) {
-        timeSpent = data.timeTaken; // This is in minutes from submission
-      } else if (data.timeSpent !== undefined) {
-        timeSpent = data.timeSpent; // This might be in different units, keep as is
-      }
-
-      // Prepare question time data with validation
-      let questionTimeData: Array<{ questionNumber: number; timeSpent: number }> = [];
-      if (data.questionTimeData && Array.isArray(data.questionTimeData)) {
-        questionTimeData = data.questionTimeData.filter(item => 
-          typeof item === 'object' && 
-          typeof item.questionNumber === 'number' && 
-          typeof item.timeSpent === 'number'
-        );
-      }
-
-      const finalResultsData: ResultsData = {
-        sessionId: data.sessionId,
-        score: data.score,
-        maxScore: data.maxScore,
-        percentage: data.percentage,
-        answeredQuestions: data.answeredQuestions,
-        totalQuestions: data.totalQuestions || questions.length,
-        timeTaken: data.timeTaken,
-        timeSpent: data.timeSpent,
-        answers,
-        questions,
-        subject,
-        questionTimeData
-      };
-
-      console.log('Final results data prepared:', finalResultsData);
-      setResultsData(finalResultsData);
-      setIsLoading(false);
     };
 
     loadResultsData();
   }, [location.state, navigate]);
 
+  // Handle loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -125,12 +133,13 @@ const Results = () => {
     );
   }
 
-  if (!resultsData) {
+  // Handle error state
+  if (error || !resultsData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">No Results Found</h2>
-          <p className="text-gray-600 mb-4">Unable to load test results.</p>
+          <h2 className="text-2xl font-bold mb-4">Unable to Load Results</h2>
+          <p className="text-gray-600 mb-4">{error || 'No results data available'}</p>
           <button 
             onClick={() => navigate('/')} 
             className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
@@ -152,9 +161,9 @@ const Results = () => {
     passedPercentage
   });
 
-  // Determine final percentage - use passed percentage if available and valid, otherwise calculate
+  // Determine final percentage with proper validation
   let finalPercentage: number;
-  if (passedPercentage !== undefined && passedPercentage >= 0 && passedPercentage <= 100) {
+  if (typeof passedPercentage === 'number' && passedPercentage >= 0 && passedPercentage <= 100) {
     finalPercentage = Math.round(passedPercentage);
   } else if (results.maxScore > 0) {
     finalPercentage = Math.round((results.score / results.maxScore) * 100);
@@ -162,22 +171,21 @@ const Results = () => {
     finalPercentage = 0;
   }
 
-  // Calculate time spent for display - convert minutes to proper format
+  // Calculate time spent for display
   const timeSpentInMinutes = resultsData.timeTaken || resultsData.timeSpent || 0;
   const timeSpentFormatted = formatTimeSpent(timeSpentInMinutes);
 
   const gradeInfo = getGrade(finalPercentage);
 
-  // Generate realistic question time data if not provided
+  // Generate question time data if not provided
   const finalQuestionTimeData = questionTimeData && questionTimeData.length > 0 
     ? questionTimeData 
     : questions.map((_, index) => {
         const questionNum = index + 1;
         const isAnswered = answers[questionNum];
-        // Generate realistic time based on question complexity and whether it was answered
+        // Generate realistic time based on whether question was answered
         let baseTime = 0;
         if (isAnswered) {
-          // Answered questions: 30-180 seconds based on question type and marks
           const question = questions[index];
           const complexityMultiplier = question?.marks > 1 ? 1.5 : 1;
           baseTime = Math.floor((Math.random() * 150 + 30) * complexityMultiplier);

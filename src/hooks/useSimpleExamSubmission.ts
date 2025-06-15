@@ -27,59 +27,88 @@ export const useSimpleExamSubmission = ({
   const { toast } = useToast();
 
   const submitExam = async () => {
-    if (!sessionId || isSubmitting) return;
+    if (!sessionId || isSubmitting) {
+      console.warn('Submit called with invalid state:', { sessionId, isSubmitting });
+      return;
+    }
 
-    console.log('Starting exam submission...');
+    console.log('=== STARTING EXAM SUBMISSION ===');
     console.log('Session ID:', sessionId);
-    console.log('Questions:', questions.length);
-    console.log('Answers:', Object.keys(answers).length);
+    console.log('Questions count:', questions.length);
+    console.log('Answers count:', Object.keys(answers).length);
+    console.log('Time left:', timeLeft);
+    console.log('Subject:', subject);
     
     setIsSubmitting(true);
 
     try {
+      // Validate required data
+      if (!Array.isArray(questions) || questions.length === 0) {
+        throw new Error('No questions available for submission');
+      }
+
       const totalQuestions = questions.length;
       const answeredQuestions = Object.keys(answers).length;
       
-      // Calculate score and other metrics
+      console.log('=== CALCULATING SCORES ===');
+      
+      // Calculate score and metrics with detailed logging
       let totalScore = 0;
       let maxPossibleScore = 0;
+      let correctAnswers = 0;
+      let wrongAnswers = 0;
       
       questions.forEach((question, index) => {
         const questionNumber = index + 1;
         const userAnswer = answers[questionNumber];
-        const marks = question.marks || 1;
+        const marks = typeof question.marks === 'number' ? question.marks : 1;
+        
         maxPossibleScore += marks;
         
-        if (userAnswer) {
-          const isCorrect = String(userAnswer).trim() === String(question.correct_answer).trim();
+        if (userAnswer !== undefined && userAnswer !== '') {
+          // Normalize answers for comparison
+          const normalizedUserAnswer = String(userAnswer).trim();
+          const normalizedCorrectAnswer = String(question.correct_answer).trim();
+          const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
+          
+          console.log(`Q${questionNumber}: User="${normalizedUserAnswer}" vs Correct="${normalizedCorrectAnswer}" = ${isCorrect}`);
+          
           if (isCorrect) {
+            correctAnswers++;
             totalScore += marks;
-          } else if (question.question_type === 'MCQ') {
-            const negativeMarks = question.negative_marks || (marks === 1 ? 1/3 : 2/3);
-            totalScore -= negativeMarks;
+          } else {
+            wrongAnswers++;
+            // Apply negative marking only for MCQ questions
+            if (question.question_type === 'MCQ') {
+              const negativeMarks = typeof question.negative_marks === 'number' 
+                ? question.negative_marks 
+                : (marks === 1 ? 1/3 : 2/3);
+              totalScore -= negativeMarks;
+            }
           }
         }
       });
 
-      // Ensure score doesn't go below 0
-      totalScore = Math.max(0, totalScore);
-      totalScore = Math.round(totalScore * 100) / 100; // Round to 2 decimal places
+      // Ensure score doesn't go below 0 and round properly
+      totalScore = Math.max(0, Math.round(totalScore * 100) / 100);
       
       const percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
       
-      // Calculate time taken (3 hours - time left in seconds, convert to minutes)
-      const totalTimeInSeconds = 180 * 60; // 3 hours
-      const timeTakenInSeconds = totalTimeInSeconds - timeLeft;
+      // Calculate time taken (total exam time - time left)
+      const totalTimeInSeconds = 180 * 60; // 3 hours in seconds
+      const timeTakenInSeconds = Math.max(0, totalTimeInSeconds - timeLeft);
       const timeTakenInMinutes = Math.round(timeTakenInSeconds / 60);
 
-      console.log('Submitting with:', {
-        score: totalScore,
-        percentage,
-        timeTaken: timeTakenInMinutes,
-        answeredQuestions
-      });
+      console.log('=== FINAL CALCULATIONS ===');
+      console.log('Total Score:', totalScore);
+      console.log('Max Possible Score:', maxPossibleScore);
+      console.log('Percentage:', percentage);
+      console.log('Correct Answers:', correctAnswers);
+      console.log('Wrong Answers:', wrongAnswers);
+      console.log('Time Taken (minutes):', timeTakenInMinutes);
 
       // Submit to database
+      console.log('=== SUBMITTING TO DATABASE ===');
       await submitTestSession(sessionId, {
         end_time: new Date().toISOString(),
         answered_questions: answeredQuestions,
@@ -88,9 +117,9 @@ export const useSimpleExamSubmission = ({
         time_taken: timeTakenInMinutes
       });
 
-      console.log('Exam submitted successfully');
+      console.log('Database submission successful');
       
-      // Prepare complete results data
+      // Prepare comprehensive results data
       const resultsData = {
         sessionId,
         score: totalScore,
@@ -100,44 +129,61 @@ export const useSimpleExamSubmission = ({
         totalQuestions,
         timeTaken: timeTakenInMinutes,
         timeSpent: timeTakenInMinutes, // For backward compatibility
-        answers,
-        questions,
+        answers: { ...answers }, // Create a copy to avoid reference issues
+        questions: [...questions], // Create a copy to avoid reference issues
         subject: subject || 'Unknown',
-        questionTimeData: questionTimeData || []
+        questionTimeData: questionTimeData.length > 0 ? [...questionTimeData] : []
       };
 
-      console.log('Prepared results data:', resultsData);
+      console.log('=== PREPARED RESULTS DATA ===');
+      console.log('Results data keys:', Object.keys(resultsData));
+      console.log('Answers keys count:', Object.keys(resultsData.answers).length);
+      console.log('Questions count:', resultsData.questions.length);
+      console.log('Question time data count:', resultsData.questionTimeData.length);
 
-      // Store in sessionStorage as backup
+      // Store in sessionStorage as backup with error handling
       try {
-        sessionStorage.setItem('examResults', JSON.stringify(resultsData));
-        console.log('Results data stored in sessionStorage');
-      } catch (error) {
-        console.error('Failed to store results in sessionStorage:', error);
+        const dataToStore = JSON.stringify(resultsData);
+        sessionStorage.setItem('examResults', dataToStore);
+        console.log('Results data stored in sessionStorage successfully');
+      } catch (storageError) {
+        console.error('Failed to store results in sessionStorage:', storageError);
+        // Don't fail the submission for storage issues
       }
 
+      // Show success toast
       toast({
-        title: "Exam Submitted",
-        description: "Your test has been submitted successfully.",
+        title: "Exam Submitted Successfully",
+        description: `Score: ${totalScore}/${maxPossibleScore} (${percentage}%)`,
       });
 
+      console.log('=== NAVIGATING TO RESULTS ===');
+      
       // Navigate to results with complete data
-      console.log('Navigating to results page...');
       navigate('/results', {
         state: resultsData,
-        replace: true // Use replace to prevent going back to exam
+        replace: true // Prevent going back to exam
       });
+
+      console.log('Navigation initiated to results page');
+      
     } catch (error) {
-      console.error('Error submitting exam:', error);
+      console.error('=== SUBMISSION ERROR ===');
+      console.error('Error details:', error);
+      
       toast({
-        title: "Submission Error", 
-        description: "Failed to submit the test. Please try again.",
+        title: "Submission Failed", 
+        description: error instanceof Error ? error.message : "Failed to submit the test. Please try again.",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
+      console.log('=== SUBMISSION PROCESS COMPLETED ===');
     }
   };
 
-  return { submitExam, isSubmitting };
+  return { 
+    submitExam, 
+    isSubmitting 
+  };
 };

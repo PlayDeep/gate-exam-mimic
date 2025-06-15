@@ -73,6 +73,7 @@ const Exam = () => {
   // Authentication check
   useEffect(() => {
     if (!loading && !user) {
+      console.log('User not authenticated, redirecting to home');
       toast({
         title: "Authentication Required",
         description: "Please log in to take the test.",
@@ -85,15 +86,21 @@ const Exam = () => {
   // Initialize exam - only run once
   useEffect(() => {
     const initializeExam = async () => {
-      if (!subject || !user || sessionId) return; // Don't reinitialize if already done
+      // Prevent reinitialization
+      if (!subject || !user || sessionId || isLoading === false) {
+        console.log('Skipping initialization:', { subject, user: !!user, sessionId, isLoading });
+        return;
+      }
       
       try {
+        console.log('=== INITIALIZING EXAM ===');
+        console.log('Subject:', subject);
         setIsLoading(true);
-        console.log('Initializing exam for subject:', subject);
         
         const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
         
         if (fetchedQuestions.length === 0) {
+          console.error('No questions found for subject:', subject);
           toast({
             title: "No Questions Available",
             description: "No questions found for this subject.",
@@ -103,18 +110,21 @@ const Exam = () => {
           return;
         }
         
-        console.log('Questions loaded:', fetchedQuestions.length);
+        console.log('Questions loaded successfully:', fetchedQuestions.length);
         setQuestions(fetchedQuestions);
         
         const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
-        console.log('Session created:', newSessionId);
+        console.log('Session created successfully:', newSessionId);
         setSessionId(newSessionId);
         
+        console.log('=== EXAM INITIALIZATION COMPLETE ===');
+        
       } catch (error) {
-        console.error('Error initializing exam:', error);
+        console.error('=== EXAM INITIALIZATION ERROR ===');
+        console.error('Error details:', error);
         toast({
-          title: "Error",
-          description: "Failed to load test questions.",
+          title: "Initialization Error",
+          description: error instanceof Error ? error.message : "Failed to load test questions.",
           variant: "destructive",
         });
         navigate('/');
@@ -124,7 +134,7 @@ const Exam = () => {
     };
 
     initializeExam();
-  }, [subject, user]); // Removed dependencies that could cause re-runs
+  }, [subject, user]); // Minimal dependencies to prevent re-runs
 
   // Start question timer only after exam is fully initialized
   useEffect(() => {
@@ -164,8 +174,9 @@ const Exam = () => {
     }
   };
 
-  // Handle answer change
+  // Handle answer change with improved error handling
   const handleAnswerChange = async (questionId: number, answer: string) => {
+    console.log(`Answer changed for Q${questionId}:`, answer);
     updateAnswer(questionId, answer);
     
     if (sessionId && questions[questionId - 1]) {
@@ -188,8 +199,11 @@ const Exam = () => {
           marksAwarded,
           getTimeSpent(questionId)
         );
+        console.log(`Answer saved successfully for Q${questionId}`);
       } catch (error) {
-        console.error('Error saving answer:', error);
+        console.error('Error saving answer for Q${questionId}:', error);
+        // Don't show error to user for answer saving failures
+        // The exam can continue and final submission will handle the score
       }
     }
   };
@@ -216,46 +230,70 @@ const Exam = () => {
     window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
   };
 
-  // Handle submit with proper logging
+  // Handle submit with comprehensive validation
   const handleSubmit = async () => {
-    console.log('Submit button clicked');
+    console.log('=== SUBMIT BUTTON CLICKED ===');
     console.log('Current state:', {
       sessionId,
       questionsLength: questions.length,
       answersCount: Object.keys(answers).length,
-      isSubmitting
+      isSubmitting,
+      timeLeft
     });
     
+    // Validate session state
     if (!sessionId) {
-      console.error('No session ID available');
+      console.error('No session ID available for submission');
       toast({
-        title: "Error",
-        description: "No active session found.",
+        title: "Submission Error",
+        description: "No active session found. Please restart the exam.",
         variant: "destructive",
       });
       return;
     }
 
+    if (questions.length === 0) {
+      console.error('No questions available for submission');
+      toast({
+        title: "Submission Error",
+        description: "No questions loaded. Please restart the exam.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isSubmitting) {
+      console.log('Submission already in progress, ignoring duplicate click');
+      return;
+    }
+
+    // Stop the current question timer before submission
+    stopTimer();
+    
+    console.log('All validations passed, proceeding with submission...');
     await submitExam();
   };
 
+  // Loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-lg">Loading test questions...</p>
+          <p className="mt-2 text-sm text-gray-600">Subject: {subject?.toUpperCase()}</p>
         </div>
       </div>
     );
   }
 
+  // No questions state
   if (questions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">No Questions Available</h2>
-          <p className="mb-4">No questions found for this subject.</p>
+          <p className="mb-4">No questions found for {subject?.toUpperCase()} subject.</p>
           <Button onClick={() => navigate('/')}>Go Back</Button>
         </div>
       </div>

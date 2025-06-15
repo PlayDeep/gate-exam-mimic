@@ -24,6 +24,12 @@ export const useResultsCalculator = ({
 }: ResultsCalculatorProps): ResultsData => {
   
   const calculateResults = (): ResultsData => {
+    console.log('=== RESULTS CALCULATOR START ===');
+    console.log('Input questions:', questions.length);
+    console.log('Input answers:', Object.keys(answers || {}).length);
+    console.log('Passed score:', passedScore);
+    console.log('Passed percentage:', passedPercentage);
+    
     // Validate inputs
     if (!Array.isArray(questions) || questions.length === 0) {
       console.error('Invalid questions data:', questions);
@@ -39,7 +45,7 @@ export const useResultsCalculator = ({
     }
 
     const answersObj = answers || {};
-    let score = passedScore !== undefined ? passedScore : 0;
+    let calculatedScore = 0;
     let correctAnswers = 0;
     let wrongAnswers = 0;
     let unanswered = 0;
@@ -51,15 +57,16 @@ export const useResultsCalculator = ({
       return sum + marks;
     }, 0);
 
+    console.log('Max possible score:', maxScore);
+
     // Process each question
     questions.forEach((question: any, index: number) => {
       const questionNum = index + 1;
       const userAnswer = answersObj[questionNum];
       
       // Normalize answers for comparison
-      const normalizedUserAnswer = userAnswer ? String(userAnswer).trim() : '';
+      const normalizedUserAnswer = userAnswer !== undefined && userAnswer !== '' ? String(userAnswer).trim() : '';
       const normalizedCorrectAnswer = String(question.correct_answer || question.correctAnswer || '').trim();
-      const isCorrect = normalizedUserAnswer && normalizedUserAnswer === normalizedCorrectAnswer;
       
       // Get question properties with defaults
       const marks = typeof question.marks === 'number' ? question.marks : 1;
@@ -84,56 +91,56 @@ export const useResultsCalculator = ({
         // Unanswered question
         unanswered++;
         subjectWiseAnalysis[subject].unanswered++;
-      } else if (isCorrect) {
-        // Correct answer
-        correctAnswers++;
-        subjectWiseAnalysis[subject].correct++;
-        subjectWiseAnalysis[subject].score += marks;
-        
-        // Add to total score only if we're calculating it (not using passed score)
-        if (passedScore === undefined) {
-          score += marks;
-        }
+        console.log(`Q${questionNum}: Unanswered`);
       } else {
-        // Wrong answer
-        wrongAnswers++;
-        subjectWiseAnalysis[subject].wrong++;
+        // Check if answer is correct
+        const isCorrect = normalizedUserAnswer === normalizedCorrectAnswer;
         
-        // Apply negative marking only for MCQ questions
-        if (question.question_type === 'MCQ') {
-          subjectWiseAnalysis[subject].score -= negativeMarks;
+        if (isCorrect) {
+          // Correct answer
+          correctAnswers++;
+          subjectWiseAnalysis[subject].correct++;
+          subjectWiseAnalysis[subject].score += marks;
           
-          // Subtract from total score only if we're calculating it (not using passed score)
+          // Add to calculated score only if we're not using passed score
           if (passedScore === undefined) {
-            score -= negativeMarks;
+            calculatedScore += marks;
           }
+          
+          console.log(`Q${questionNum}: Correct (${marks} marks)`);
+        } else {
+          // Wrong answer
+          wrongAnswers++;
+          subjectWiseAnalysis[subject].wrong++;
+          
+          // Apply negative marking only for MCQ questions
+          if (question.question_type === 'MCQ') {
+            subjectWiseAnalysis[subject].score -= negativeMarks;
+            
+            // Subtract from calculated score only if we're not using passed score
+            if (passedScore === undefined) {
+              calculatedScore -= negativeMarks;
+            }
+          }
+          
+          console.log(`Q${questionNum}: Wrong (${question.question_type === 'MCQ' ? -negativeMarks : 0} marks)`);
         }
       }
     });
 
-    // Ensure score doesn't go below 0
-    score = Math.max(0, score);
+    // Use passed score if available, otherwise use calculated score
+    let finalScore = passedScore !== undefined ? passedScore : calculatedScore;
     
-    // Round score to 2 decimal places
-    score = Math.round(score * 100) / 100;
+    // Ensure score doesn't go below 0 and round properly
+    finalScore = Math.max(0, Math.round(finalScore * 100) / 100);
 
     // Round subject-wise scores
     Object.values(subjectWiseAnalysis).forEach((analysis: any) => {
-      analysis.score = Math.round(analysis.score * 100) / 100;
+      analysis.score = Math.max(0, Math.round(analysis.score * 100) / 100);
     });
 
-    console.log('Results calculation:', {
-      totalQuestions: questions.length,
-      correctAnswers,
-      wrongAnswers,
-      unanswered,
-      calculatedScore: score,
-      passedScore,
-      maxScore
-    });
-
-    return {
-      score,
+    const result = {
+      score: finalScore,
       correctAnswers,
       wrongAnswers,
       unanswered,
@@ -141,6 +148,11 @@ export const useResultsCalculator = ({
       maxScore,
       subjectWiseAnalysis
     };
+
+    console.log('=== RESULTS CALCULATOR END ===');
+    console.log('Final result:', result);
+
+    return result;
   };
 
   return calculateResults();
