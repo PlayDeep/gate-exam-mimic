@@ -13,6 +13,7 @@ export const useExamInitialization = () => {
   const { user, loading } = useAuth();
   const { toast } = useToast();
   const initializationAttemptedRef = useRef(false);
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sessionId, setSessionId] = useState<string>('');
@@ -107,8 +108,13 @@ export const useExamInitialization = () => {
           variant: "destructive",
         });
         
+        // Clear any existing timeout
+        if (navigationTimeoutRef.current) {
+          clearTimeout(navigationTimeoutRef.current);
+        }
+        
         // Delay navigation to allow user to see the error
-        setTimeout(() => {
+        navigationTimeoutRef.current = setTimeout(() => {
           navigate('/');
         }, 3000);
       } finally {
@@ -118,6 +124,15 @@ export const useExamInitialization = () => {
 
     initializeExam();
   }, [subject, user, loading, navigate, toast]);
+
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return {
     questions,

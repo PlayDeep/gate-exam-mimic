@@ -104,6 +104,7 @@ export const useSimpleExamSubmission = ({
         }
       });
 
+      // Ensure score doesn't go below 0
       totalScore = Math.max(0, Math.round(totalScore * 100) / 100);
       const percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
       
@@ -154,6 +155,7 @@ export const useSimpleExamSubmission = ({
         timeDataCount: resultsData.questionTimeData.length
       });
 
+      // Enhanced storage with error handling
       try {
         const dataToStore = JSON.stringify(resultsData);
         if (typeof Storage !== 'undefined' && window.sessionStorage) {
@@ -164,6 +166,7 @@ export const useSimpleExamSubmission = ({
         }
       } catch (storageError) {
         console.error('Failed to store results in sessionStorage:', storageError);
+        // Continue anyway, navigation state should work
       }
 
       toast({
@@ -173,12 +176,18 @@ export const useSimpleExamSubmission = ({
 
       console.log('=== NAVIGATING TO RESULTS ===');
       
-      navigate('/results', {
-        state: resultsData,
-        replace: true
-      });
-
-      console.log('Navigation initiated to results page');
+      // Enhanced navigation with fallback
+      try {
+        navigate('/results', {
+          state: resultsData,
+          replace: true
+        });
+        console.log('Navigation initiated to results page');
+      } catch (navError) {
+        console.error('Navigation error:', navError);
+        // Fallback to home page if navigation fails
+        navigate('/', { replace: true });
+      }
       
     } catch (error) {
       console.error('=== SUBMISSION ERROR ===');
@@ -191,8 +200,14 @@ export const useSimpleExamSubmission = ({
         description: errorMessage,
         variant: "destructive",
       });
-    } finally {
+
+      // Reset submitting state on error to allow retry
       setIsSubmitting(false);
+    } finally {
+      // Only set to false if no error occurred (successful submission should not reset this)
+      if (!error) {
+        setIsSubmitting(false);
+      }
       console.log('=== SUBMISSION PROCESS COMPLETED ===');
     }
   };

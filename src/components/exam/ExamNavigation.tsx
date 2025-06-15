@@ -23,6 +23,11 @@ const ExamNavigation = ({
   onNext,
   onPrevious
 }: ExamNavigationProps) => {
+  const isFirstQuestion = currentQuestion === 1;
+  const isLastQuestion = currentQuestion >= totalQuestions;
+  const hasQuestions = totalQuestions > 0;
+  const isMarked = markedForReview.has(currentQuestion);
+
   return (
     <div className="bg-white border-t p-4">
       <div className="flex justify-between items-center">
@@ -30,17 +35,19 @@ const ExamNavigation = ({
           <Button
             variant="outline"
             onClick={onMarkForReview}
-            className={markedForReview.has(currentQuestion) ? 'bg-purple-50' : ''}
-            disabled={isLoading}
+            className={isMarked ? 'bg-purple-50 border-purple-200' : ''}
+            disabled={isLoading || !hasQuestions}
+            title={isMarked ? 'Remove from review' : 'Mark for review'}
           >
-            <Flag className="w-4 h-4 mr-1" />
-            {markedForReview.has(currentQuestion) ? 'Unmark' : 'Mark'} for Review
+            <Flag className={`w-4 h-4 mr-1 ${isMarked ? 'text-purple-600' : ''}`} />
+            {isMarked ? 'Unmark' : 'Mark'} for Review
           </Button>
           
           <Button
             variant="outline"
             onClick={onClearResponse}
-            disabled={isLoading}
+            disabled={isLoading || !hasQuestions}
+            title="Clear your answer for this question"
           >
             Clear Response
           </Button>
@@ -49,16 +56,18 @@ const ExamNavigation = ({
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
-            disabled={currentQuestion === 1 || isLoading}
+            disabled={isFirstQuestion || isLoading || !hasQuestions}
             onClick={onPrevious}
+            title={isFirstQuestion ? 'Already at first question' : 'Go to previous question'}
           >
             Previous
           </Button>
           
           <Button
             variant="outline"
-            disabled={currentQuestion >= totalQuestions || totalQuestions === 0 || isLoading}
+            disabled={isLastQuestion || isLoading || !hasQuestions}
             onClick={onNext}
+            title={isLastQuestion ? 'Already at last question' : 'Go to next question'}
           >
             Next
           </Button>

@@ -21,6 +21,7 @@ interface ExamContainerProps {
 
 const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionId, subject }: ExamContainerProps) => {
   const isInitializedRef = useRef(false);
+  const isMountedRef = useRef(true);
   
   const {
     timeLeft,
@@ -89,9 +90,17 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
 
   const { toggleFullscreen } = useExamFullscreen({ setIsFullscreen });
 
+  // Component mounted tracking
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Initialize with props - only once to prevent loops
   useEffect(() => {
-    if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current) {
+    if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current && isMountedRef.current) {
       console.log('ExamContainer: Initializing with props data');
       setQuestions(initialQuestions);
       setSessionId(initialSessionId);
@@ -100,6 +109,15 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     }
   }, [initialQuestions, initialSessionId, setQuestions, setSessionId, setIsLoading]);
 
+  // Cleanup effect
+  useEffect(() => {
+    return () => {
+      console.log('ExamContainer: Component unmounting, cleaning up timers');
+      cleanupTimers();
+      isMountedRef.current = false;
+    };
+  }, [cleanupTimers]);
+
   const openCalculator = () => {
     window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
   };
@@ -107,8 +125,13 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   const handleSubmit = async () => {
     console.log('ExamContainer: Submit button clicked');
     
-    if (!sessionId || questions.length === 0 || isSubmitting) {
-      console.log('ExamContainer: Invalid state for submission:', { sessionId: !!sessionId, questionsLength: questions.length, isSubmitting });
+    if (!sessionId || questions.length === 0 || isSubmitting || !isMountedRef.current) {
+      console.log('ExamContainer: Invalid state for submission:', { 
+        sessionId: !!sessionId, 
+        questionsLength: questions.length, 
+        isSubmitting,
+        isMounted: isMountedRef.current 
+      });
       return;
     }
 
