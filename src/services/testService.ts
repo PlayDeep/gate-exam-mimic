@@ -97,21 +97,6 @@ export const submitTestSession = async (
   }
 };
 
-export const checkIfTestSubmitted = async (sessionId: string): Promise<boolean> => {
-  const { data, error } = await supabase
-    .from('test_sessions')
-    .select('is_submitted')
-    .eq('id', sessionId)
-    .single();
-
-  if (error) {
-    console.error('Error checking test submission status:', error);
-    return false;
-  }
-
-  return data?.is_submitted || false;
-};
-
 export const saveUserAnswer = async (
   sessionId: string,
   questionId: string,
@@ -182,51 +167,4 @@ export const getTestSessionDetails = async (sessionId: string) => {
   }
 
   return { session, answers: answers || [] };
-};
-
-export const deleteTestSession = async (sessionId: string): Promise<void> => {
-  if (!sessionId) {
-    throw new Error('Session ID is required');
-  }
-
-  console.log('Starting deletion process for session:', sessionId);
-
-  // Delete tracking data first (optional, won't fail if doesn't exist)
-  try {
-    const { error: trackingError } = await supabase
-      .from('test_session_tracking')
-      .delete()
-      .eq('session_id', sessionId);
-
-    if (trackingError) {
-      console.warn('Warning deleting tracking data:', trackingError);
-      // Don't throw, continue with other deletions
-    }
-  } catch (error) {
-    console.warn('Non-critical error deleting tracking data:', error);
-  }
-
-  // Delete user answers
-  const { error: answersError } = await supabase
-    .from('user_answers')
-    .delete()
-    .eq('session_id', sessionId);
-
-  if (answersError) {
-    console.error('Error deleting user answers:', answersError);
-    throw answersError;
-  }
-
-  // Delete the test session
-  const { error: sessionError } = await supabase
-    .from('test_sessions')
-    .delete()
-    .eq('id', sessionId);
-
-  if (sessionError) {
-    console.error('Error deleting test session:', sessionError);
-    throw sessionError;
-  }
-
-  console.log('Successfully deleted session:', sessionId);
 };

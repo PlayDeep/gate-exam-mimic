@@ -1,7 +1,15 @@
 
 import { useParams } from "react-router-dom";
-import { useExamState } from "@/hooks/useExamState";
-import { useExamLogic } from "@/hooks/useExamLogic";
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { getRandomQuestionsForTest } from "@/services/questionService";
+import { createTestSession } from "@/services/testService";
+import { useSimpleExamState } from "@/hooks/useSimpleExamState";
+import { useExamTimer } from "@/hooks/useExamTimer";
+import { useSimpleExamSubmission } from "@/hooks/useSimpleExamSubmission";
+import { saveUserAnswer } from "@/services/testService";
 import ExamHeader from "@/components/exam/ExamHeader";
 import ExamNavigation from "@/components/exam/ExamNavigation";
 import ExamSidebar from "@/components/exam/ExamSidebar";
@@ -10,16 +18,16 @@ import { Button } from "@/components/ui/button";
 
 const Exam = () => {
   const { subject } = useParams();
+  const navigate = useNavigate();
+  const { user, loading } = useAuth();
+  const { toast } = useToast();
   
   const {
     timeLeft,
     setTimeLeft,
     currentQuestion,
-    setCurrentQuestion,
     answers,
-    setAnswers,
     markedForReview,
-    setMarkedForReview,
     isFullscreen,
     setIsFullscreen,
     questions,
@@ -28,40 +36,135 @@ const Exam = () => {
     setSessionId,
     isLoading,
     setIsLoading,
-    totalQuestions
-  } = useExamState();
-
-  const {
-    handleAnswerChange,
-    handleMarkForReview,
-    handleSubmitExam,
-    toggleFullscreen,
-    openCalculator,
-    handleNext,
-    handlePrevious,
+    totalQuestions,
+    clearAnswer,
     navigateToQuestion,
-    getTimeSpent,
-    isSubmitting
-  } = useExamLogic({
-    subject,
+    nextQuestion,
+    previousQuestion,
+    toggleMarkForReview,
+    updateAnswer
+  } = useSimpleExamState();
+
+  const { submitExam, isSubmitting } = useSimpleExamSubmission({
+    sessionId,
+    questions,
+    answers,
+    timeLeft,
+    subject
+  });
+
+  const { formattedTime } = useExamTimer({
     timeLeft,
     setTimeLeft,
-    currentQuestion,
-    setCurrentQuestion,
-    answers,
-    setAnswers,
-    markedForReview,
-    setMarkedForReview,
-    isFullscreen,
-    setIsFullscreen,
-    questions,
-    setQuestions,
-    sessionId,
-    setSessionId,
     isLoading,
-    setIsLoading,
-    totalQuestions
+    sessionId,
+    onTimeUp: submitExam
   });
+
+  // Authentication check
+  useEffect(() => {
+    if (!loading && !user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to take the test.",
+        variant: "destructive",
+      });
+      navigate('/');
+    }
+  }, [user, loading, navigate, toast]);
+
+  // Initialize exam
+  useEffect(() => {
+    const initializeExam = async () => {
+      if (!subject || !user) return;
+      
+      try {
+        setIsLoading(true);
+        
+        const fetchedQuestions = await getRandomQuestionsForTest(subject.toUpperCase(), 65);
+        
+        if (fetchedQuestions.length === 0) {
+          toast({
+            title: "No Questions Available",
+            description: "No questions found for this subject.",
+            variant: "destructive",
+          });
+          navigate('/');
+          return;
+        }
+        
+        setQuestions(fetchedQuestions);
+        
+        const newSessionId = await createTestSession(subject.toUpperCase(), fetchedQuestions.length);
+        setSessionId(newSessionId);
+        
+      } catch (error) {
+        console.error('Error initializing exam:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load test questions.",
+          variant: "destructive",
+        });
+        navigate('/');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeExam();
+  }, [subject, user, navigate, toast, setIsLoading, setQuestions, setSessionId]);
+
+  // Handle answer change
+  const handleAnswerChange = async (questionId: number, answer: string) => {
+    updateAnswer(questionId, answer);
+    
+    if (sessionId && questions[questionId - 1]) {
+      const question = questions[questionId - 1];
+      const isCorrect = String(answer).trim() === String(question.correct_answer).trim();
+      
+      let marksAwarded = 0;
+      if (isCorrect) {
+        marksAwarded = question.marks;
+      } else if (question.question_type === 'MCQ') {
+        marksAwarded = -(question.negative_marks || 0);
+      }
+      
+      try {
+        await saveUserAnswer(
+          sessionId,
+          question.id,
+          answer,
+          isCorrect,
+          marksAwarded,
+          30 // Simple time tracking
+        );
+      } catch (error) {
+        console.error('Error saving answer:', error);
+      }
+    }
+  };
+
+  // Fullscreen handlers
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [setIsFullscreen]);
+
+  const openCalculator = () => {
+    window.open('https://www.tcsion.com/OnlineAssessment/ScientificCalculator/Calculator.html#nogo', '_blank');
+  };
 
   if (isLoading) {
     return (
@@ -80,7 +183,7 @@ const Exam = () => {
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">No Questions Available</h2>
           <p className="mb-4">No questions found for this subject.</p>
-          <Button onClick={() => window.location.href = '/'}>Go Back</Button>
+          <Button onClick={() => navigate('/')}>Go Back</Button>
         </div>
       </div>
     );
@@ -89,8 +192,6 @@ const Exam = () => {
   const answeredCount = Object.keys(answers).length;
   const markedCount = markedForReview.size;
   const currentQuestionData = questions[currentQuestion - 1];
-
-  console.log('Render - Current question:', currentQuestion, 'Total questions:', totalQuestions, 'Questions length:', questions.length);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -102,7 +203,7 @@ const Exam = () => {
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
         onOpenCalculator={openCalculator}
-        onSubmitExam={handleSubmitExam}
+        onSubmitExam={submitExam}
         isSubmitting={isSubmitting}
       />
 
@@ -112,7 +213,7 @@ const Exam = () => {
             <QuestionContent
               question={currentQuestionData}
               currentQuestion={currentQuestion}
-              timeSpent={getTimeSpent(currentQuestion)}
+              timeSpent={0}
               answer={answers[currentQuestion] || ''}
               onAnswerChange={handleAnswerChange}
             />
@@ -123,16 +224,10 @@ const Exam = () => {
             totalQuestions={totalQuestions}
             isLoading={isLoading}
             markedForReview={markedForReview}
-            onMarkForReview={handleMarkForReview}
-            onClearResponse={() => {
-              setAnswers(prev => {
-                const newAnswers = { ...prev };
-                delete newAnswers[currentQuestion];
-                return newAnswers;
-              });
-            }}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
+            onMarkForReview={toggleMarkForReview}
+            onClearResponse={clearAnswer}
+            onNext={nextQuestion}
+            onPrevious={previousQuestion}
           />
         </div>
 
