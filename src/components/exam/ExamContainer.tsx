@@ -22,6 +22,7 @@ interface ExamContainerProps {
 const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionId, subject }: ExamContainerProps) => {
   const isInitializedRef = useRef(false);
   const isMountedRef = useRef(true);
+  const propsRef = useRef({ questions: initialQuestions, sessionId: initialSessionId });
   
   const {
     timeLeft,
@@ -98,16 +99,23 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     };
   }, []);
 
+  // Update props ref when props change
+  useEffect(() => {
+    propsRef.current = { questions: initialQuestions, sessionId: initialSessionId };
+  }, [initialQuestions, initialSessionId]);
+
   // Initialize with props - only once to prevent loops
   useEffect(() => {
-    if (initialQuestions.length > 0 && initialSessionId && !isInitializedRef.current && isMountedRef.current) {
+    const { questions: propQuestions, sessionId: propSessionId } = propsRef.current;
+    
+    if (propQuestions.length > 0 && propSessionId && !isInitializedRef.current && isMountedRef.current) {
       console.log('ExamContainer: Initializing with props data');
-      setQuestions(initialQuestions);
-      setSessionId(initialSessionId);
+      setQuestions(propQuestions);
+      setSessionId(propSessionId);
       setIsLoading(false);
       isInitializedRef.current = true;
     }
-  }, [initialQuestions, initialSessionId, setQuestions, setSessionId, setIsLoading]);
+  }, []); // Empty dependency array - initialization should only happen once
 
   // Cleanup effect
   useEffect(() => {

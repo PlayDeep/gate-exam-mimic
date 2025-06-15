@@ -104,7 +104,6 @@ export const useSimpleExamSubmission = ({
         }
       });
 
-      // Ensure score doesn't go below 0
       totalScore = Math.max(0, Math.round(totalScore * 100) / 100);
       const percentage = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
       
@@ -176,17 +175,47 @@ export const useSimpleExamSubmission = ({
 
       console.log('=== NAVIGATING TO RESULTS ===');
       
-      // Enhanced navigation with fallback
+      // Enhanced navigation with multiple fallback strategies
+      let navigationSuccessful = false;
+      
       try {
         navigate('/results', {
           state: resultsData,
           replace: true
         });
+        navigationSuccessful = true;
         console.log('Navigation initiated to results page');
       } catch (navError) {
-        console.error('Navigation error:', navError);
-        // Fallback to home page if navigation fails
-        navigate('/', { replace: true });
+        console.error('Primary navigation failed:', navError);
+        
+        // Fallback 1: Try navigation without state
+        try {
+          navigate('/results', { replace: true });
+          navigationSuccessful = true;
+          console.log('Fallback navigation without state successful');
+        } catch (fallbackError) {
+          console.error('Fallback navigation failed:', fallbackError);
+          
+          // Fallback 2: Try window.location as last resort
+          try {
+            window.location.href = '/results';
+            navigationSuccessful = true;
+            console.log('Window location navigation attempted');
+          } catch (locationError) {
+            console.error('All navigation methods failed:', locationError);
+            
+            // Final fallback: Show success message and let user navigate manually
+            toast({
+              title: "Exam Submitted - Navigation Error",
+              description: "Your exam was submitted successfully. Please refresh the page or navigate to results manually.",
+              variant: "destructive",
+            });
+          }
+        }
+      }
+      
+      if (!navigationSuccessful) {
+        console.error('All navigation attempts failed');
       }
       
     } catch (error) {

@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useCallback } from 'react';
 
 interface UseExamTimerProps {
@@ -56,7 +55,7 @@ export const useExamTimer = ({
         timerRef.current = null;
       }
     };
-  }, [isLoading, sessionId, setTimeLeft, handleTimeUp, timeLeft]);
+  }, [isLoading, sessionId, setTimeLeft, handleTimeUp]);
 
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);

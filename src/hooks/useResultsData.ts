@@ -27,6 +27,8 @@ export const useResultsData = () => {
   useEffect(() => {
     console.log('useResultsData: Loading results data');
     
+    let redirectTimeout: NodeJS.Timeout | null = null;
+    
     const loadResultsData = () => {
       try {
         let data = location.state;
@@ -86,19 +88,21 @@ export const useResultsData = () => {
         let questionTimeData: Array<{ questionNumber: number; timeSpent: number }> = [];
         if (data.questionTimeData && Array.isArray(data.questionTimeData)) {
           questionTimeData = data.questionTimeData
-            .filter(item => 
-              typeof item === 'object' && 
-              item !== null &&
-              typeof item.questionNumber === 'number' && 
-              typeof item.timeSpent === 'number' &&
-              item.questionNumber > 0 &&
-              item.timeSpent >= 0 &&
-              isFinite(item.timeSpent) // Ensure no NaN or Infinity values
-            )
+            .filter(item => {
+              // More robust validation
+              if (!item || typeof item !== 'object') return false;
+              if (typeof item.questionNumber !== 'number' || typeof item.timeSpent !== 'number') return false;
+              if (item.questionNumber <= 0 || item.timeSpent < 0) return false;
+              if (!isFinite(item.questionNumber) || !isFinite(item.timeSpent)) return false;
+              if (isNaN(item.questionNumber) || isNaN(item.timeSpent)) return false;
+              return true;
+            })
             .map(item => ({
-              questionNumber: Math.floor(item.questionNumber), // Ensure integer
+              questionNumber: Math.floor(Math.abs(item.questionNumber)), // Ensure positive integer
               timeSpent: Math.max(0, Math.floor(item.timeSpent)) // Ensure non-negative integer
-            }));
+            }))
+            .filter(item => item.questionNumber > 0); // Final filter for valid question numbers
+          
           console.log('useResultsData: Validated question time data:', questionTimeData.length, 'entries');
         }
 
@@ -135,19 +139,23 @@ export const useResultsData = () => {
         const errorMessage = error instanceof Error ? error.message : 'Failed to load exam results';
         setError(errorMessage);
         
-        // Redirect to home after showing error with cleanup
-        const redirectTimeout = setTimeout(() => {
+        // Redirect to home after showing error with proper cleanup
+        redirectTimeout = setTimeout(() => {
           navigate('/', { replace: true });
         }, 3000);
-
-        // Cleanup timeout if component unmounts
-        return () => clearTimeout(redirectTimeout);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadResultsData();
+
+    // Cleanup function to clear timeout if component unmounts
+    return () => {
+      if (redirectTimeout) {
+        clearTimeout(redirectTimeout);
+      }
+    };
   }, [location.state, navigate]);
 
   return { resultsData, isLoading, error };
