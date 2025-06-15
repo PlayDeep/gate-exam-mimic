@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Question } from '@/services/questionService';
 import { submitTestSession } from '@/services/testService';
@@ -27,17 +27,18 @@ export const useSimpleExamSubmission = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMountedRef = useRef(true);
+  const submissionInProgressRef = useRef(false);
 
   const {
     validateSubmissionState,
     markSubmissionAttempted,
-    resetSubmissionAttempt,
-    isMountedRef
+    resetSubmissionAttempt
   } = useSubmissionValidation();
 
   const { calculateResults } = useResultsCalculation();
 
-  // Track component mount status
+  // Component mount tracking
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -47,6 +48,21 @@ export const useSimpleExamSubmission = ({
 
   const submitExam = useCallback(async () => {
     console.log('=== STARTING EXAM SUBMISSION ===');
+    
+    // Check if component is still mounted
+    if (!isMountedRef.current) {
+      console.log('Component unmounted, aborting submission');
+      return;
+    }
+
+    // Check if submission is already in progress
+    if (submissionInProgressRef.current) {
+      console.log('Submission already in progress, aborting');
+      return;
+    }
+
+    // Mark submission as in progress immediately
+    submissionInProgressRef.current = true;
     
     // Validate submission state
     const validation = validateSubmissionState({
@@ -59,17 +75,24 @@ export const useSimpleExamSubmission = ({
     
     if (!validation.isValid) {
       console.error('Submission blocked:', validation.error);
-      toast({
-        title: "Submission Error",
-        description: validation.error || "Invalid state for submission",
-        variant: "destructive",
-      });
+      submissionInProgressRef.current = false;
+      
+      if (isMountedRef.current) {
+        toast({
+          title: "Submission Error",
+          description: validation.error || "Invalid state for submission",
+          variant: "destructive",
+        });
+      }
       return;
     }
 
     // Mark submission as attempted
     markSubmissionAttempted();
-    setIsSubmitting(true);
+    
+    if (isMountedRef.current) {
+      setIsSubmitting(true);
+    }
 
     try {
       // Calculate results
@@ -112,14 +135,16 @@ export const useSimpleExamSubmission = ({
         console.error('Failed to store results in sessionStorage:', storageError);
       }
 
-      toast({
-        title: "Exam Submitted Successfully",
-        description: `Score: ${results.totalScore}/${results.maxPossibleScore} (${results.percentage}%)`,
-      });
+      if (isMountedRef.current) {
+        toast({
+          title: "Exam Submitted Successfully",
+          description: `Score: ${results.totalScore}/${results.maxPossibleScore} (${results.percentage}%)`,
+        });
+      }
 
       console.log('=== NAVIGATING TO RESULTS ===');
       
-      // Navigate to results
+      // Navigate to results only if component is still mounted
       if (isMountedRef.current) {
         navigate('/results', {
           state: resultsData,
@@ -133,6 +158,7 @@ export const useSimpleExamSubmission = ({
       console.error('Error details:', error);
       
       // Reset submission state on error
+      submissionInProgressRef.current = false;
       resetSubmissionAttempt();
       
       if (isMountedRef.current) {
@@ -150,7 +176,7 @@ export const useSimpleExamSubmission = ({
   }, [
     sessionId, questions, answers, timeLeft, subject, questionTimeData,
     validateSubmissionState, calculateResults, markSubmissionAttempted, 
-    resetSubmissionAttempt, navigate, toast, isMountedRef
+    resetSubmissionAttempt, navigate, toast
   ]);
 
   return { 

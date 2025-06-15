@@ -12,15 +12,6 @@ interface ValidationProps {
 
 export const useSubmissionValidation = () => {
   const submissionAttemptedRef = useRef(false);
-  const isMountedRef = useRef(true);
-
-  // Track component mount status
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
 
   const validateSubmissionState = useCallback(({
     sessionId,
@@ -31,12 +22,6 @@ export const useSubmissionValidation = () => {
   }: ValidationProps) => {
     console.log('=== VALIDATING SUBMISSION STATE ===');
     
-    // Check if component is mounted
-    if (!isMountedRef.current) {
-      console.error('Validation failed: Component not mounted');
-      return { isValid: false, error: 'Component not mounted' };
-    }
-
     // Check if already submitting
     if (isSubmitting) {
       console.error('Validation failed: Already submitting');
@@ -110,7 +95,6 @@ export const useSubmissionValidation = () => {
   return {
     validateSubmissionState,
     markSubmissionAttempted,
-    resetSubmissionAttempt,
-    isMountedRef
+    resetSubmissionAttempt
   };
 };

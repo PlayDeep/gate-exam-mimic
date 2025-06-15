@@ -22,6 +22,7 @@ interface ExamContainerProps {
 const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionId, subject }: ExamContainerProps) => {
   const isInitializedRef = useRef(false);
   const isMountedRef = useRef(true);
+  const submissionHandledRef = useRef(false);
   
   const {
     timeLeft,
@@ -70,12 +71,30 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     setIsSubmitting(submissionInProgress);
   }, [submissionInProgress, setIsSubmitting]);
 
+  const handleTimeUp = useCallback(async () => {
+    console.log('ExamContainer: Time up triggered');
+    
+    if (!isMountedRef.current || submissionHandledRef.current) {
+      console.log('ExamContainer: Already handled or unmounted');
+      return;
+    }
+    
+    submissionHandledRef.current = true;
+    
+    try {
+      await submitExam();
+    } catch (error) {
+      console.error('ExamContainer: Time up submission failed:', error);
+      submissionHandledRef.current = false;
+    }
+  }, [submitExam]);
+
   const { formattedTime } = useExamTimer({
     timeLeft,
     setTimeLeft,
     isLoading: isLoading || questions.length === 0,
     sessionId,
-    onTimeUp: submitExam
+    onTimeUp: handleTimeUp
   });
 
   const { handleAnswerChange } = useExamAnswerHandler({
@@ -143,10 +162,12 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
       return;
     }
 
-    if (submissionInProgress) {
-      console.log('ExamContainer: Submission already in progress');
+    if (submissionInProgress || submissionHandledRef.current) {
+      console.log('ExamContainer: Submission already in progress or handled');
       return;
     }
+
+    submissionHandledRef.current = true;
 
     // Cleanup timers before submission
     cleanupTimers();
@@ -155,6 +176,7 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
       await submitExam();
     } catch (error) {
       console.error('ExamContainer: Submission failed:', error);
+      submissionHandledRef.current = false;
     }
   };
 
