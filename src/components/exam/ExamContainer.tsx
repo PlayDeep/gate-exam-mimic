@@ -32,42 +32,32 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
     isMountedRef
   } = containerState;
 
-  // Create a stable props object to prevent re-creation
-  const stableHandlerProps = useRef({
-    ...containerState,
-    subject
+  // Create stable props using useRef to prevent re-creation
+  const stableStateRef = useRef(containerState);
+  const stableSubjectRef = useRef(subject);
+  
+  // Only update refs when essential values change
+  useEffect(() => {
+    stableStateRef.current = containerState;
+    stableSubjectRef.current = subject;
   });
 
-  // Only update the ref when actual values change, not on every render
-  const propsHash = useMemo(() => {
-    return `${containerState.sessionId}-${containerState.questions.length}-${containerState.timeLeft}-${containerState.currentQuestion}-${Object.keys(containerState.answers).length}-${containerState.markedForReview.size}-${containerState.isFullscreen}-${containerState.isLoading}-${containerState.isSubmitting}-${containerState.totalQuestions}-${subject}`;
-  }, [
-    containerState.sessionId,
-    containerState.questions.length,
-    containerState.timeLeft,
-    containerState.currentQuestion,
-    Object.keys(containerState.answers).length,
-    containerState.markedForReview.size,
-    containerState.isFullscreen,
-    containerState.isLoading,
-    containerState.isSubmitting,
-    containerState.totalQuestions,
-    subject
+  // Create ultra-stable handler props
+  const handlerProps = useMemo(() => ({
+    ...stableStateRef.current,
+    subject: stableSubjectRef.current
+  }), [
+    // Only include values that actually affect handlers
+    sessionId,
+    questions.length,
+    currentQuestion,
+    Object.keys(answers).length,
+    markedForReview.size,
+    isLoading,
+    containerState.isSubmitting
   ]);
 
-  const lastPropsHashRef = useRef('');
-  
-  useEffect(() => {
-    if (lastPropsHashRef.current !== propsHash) {
-      stableHandlerProps.current = {
-        ...containerState,
-        subject
-      };
-      lastPropsHashRef.current = propsHash;
-    }
-  }, [propsHash, containerState, subject]);
-
-  const handlers = useExamHandlers(stableHandlerProps.current);
+  const handlers = useExamHandlers(handlerProps);
 
   // Loading state
   if (isLoading || questions.length === 0) {
@@ -77,6 +67,16 @@ const ExamContainer = ({ questions: initialQuestions, sessionId: initialSessionI
   const answeredCount = Object.keys(answers).length;
   const markedCount = markedForReview.size;
   const currentQuestionData = questions[currentQuestion - 1];
+
+  console.log('ExamContainer: Rendering with state:', {
+    currentQuestion,
+    totalQuestions,
+    answeredCount,
+    markedCount,
+    submissionInProgress: handlers.submissionInProgress,
+    timeLeft,
+    sessionId
+  });
 
   return (
     <>

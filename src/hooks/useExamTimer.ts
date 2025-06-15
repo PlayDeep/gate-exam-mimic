@@ -21,6 +21,7 @@ export const useExamTimer = ({
   const isMountedRef = useRef(true);
   const isTimerActiveRef = useRef(false);
   const isSubmittingRef = useRef(false);
+  const lastSessionIdRef = useRef<string>('');
 
   // Keep onTimeUp reference current
   useEffect(() => {
@@ -70,7 +71,6 @@ export const useExamTimer = ({
   const startTimer = useCallback(() => {
     // Prevent multiple timers or starting during submission
     if (isTimerActiveRef.current || isSubmittingRef.current) {
-      console.log('Timer: Already active or submitting, skipping start');
       return;
     }
 
@@ -94,26 +94,32 @@ export const useExamTimer = ({
     }, 1000);
   }, [timeLeft, setTimeLeft, handleTimeUp, cleanupTimer]);
 
-  // Main timer effect - only start when conditions are met
+  // Reset flags when session changes
   useEffect(() => {
-    // Clean up any existing timer first
-    cleanupTimer();
-    
-    // Reset time up flag when starting new session
-    if (sessionId) {
+    if (sessionId && sessionId !== lastSessionIdRef.current) {
+      console.log('Timer: New session detected, resetting flags');
       hasCalledTimeUpRef.current = false;
       isSubmittingRef.current = false;
+      lastSessionIdRef.current = sessionId;
     }
-    
-    // Don't start timer if loading, no session, already called time up, time is up, or submitting
-    if (isLoading || !sessionId || timeLeft <= 0 || hasCalledTimeUpRef.current || isSubmittingRef.current) {
-      console.log('Timer: Not starting - isLoading:', isLoading, 'sessionId:', !!sessionId, 'timeLeft:', timeLeft, 'hasCalledTimeUp:', hasCalledTimeUpRef.current, 'isSubmitting:', isSubmittingRef.current);
+  }, [sessionId]);
+
+  // Main timer effect - only start when conditions are met and avoid re-starting
+  useEffect(() => {
+    // Don't start timer if loading, no session, time is up, or already running
+    if (isLoading || !sessionId || timeLeft <= 0 || hasCalledTimeUpRef.current || isSubmittingRef.current || isTimerActiveRef.current) {
       return;
     }
     
     startTimer();
-    return cleanupTimer;
-  }, [isLoading, sessionId, startTimer, cleanupTimer]);
+    
+    // Only cleanup on unmount or when session changes
+    return () => {
+      if (!isMountedRef.current || sessionId !== lastSessionIdRef.current) {
+        cleanupTimer();
+      }
+    };
+  }, [isLoading, sessionId, startTimer, cleanupTimer]); // Removed timeLeft from dependencies to prevent recreation
 
   // Cleanup on unmount
   useEffect(() => {

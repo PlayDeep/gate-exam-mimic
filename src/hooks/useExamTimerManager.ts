@@ -17,8 +17,9 @@ export const useExamTimerManager = ({
   sessionId,
   isSubmitting
 }: UseExamTimerManagerProps) => {
-  const currentQuestionRef = useRef(1);
-  const timerCleanupRef = useRef<(() => void) | null>(null);
+  const currentQuestionRef = useRef(0);
+  const isActiveRef = useRef(false);
+  const sessionIdRef = useRef('');
   
   const { 
     startTimer, 
@@ -27,46 +28,59 @@ export const useExamTimerManager = ({
     getAllTimeData 
   } = useQuestionTimer();
 
-  // Timer management - prevent overlapping timers
+  // Reset when session changes
   useEffect(() => {
-    if (!isLoading && questionsLength > 0 && sessionId && !isSubmitting) {
-      // Only manage timer if question actually changed
-      if (currentQuestionRef.current !== currentQuestion) {
-        console.log('TimerManager: Question changed from', currentQuestionRef.current, 'to', currentQuestion);
-        
-        // Clean up previous timer
-        if (timerCleanupRef.current) {
-          timerCleanupRef.current();
-        }
-        
-        // Stop any existing timer
-        stopTimer();
-        
-        // Start new timer
-        startTimer(currentQuestion);
-        currentQuestionRef.current = currentQuestion;
-        
-        // Store cleanup function
-        timerCleanupRef.current = () => {
-          stopTimer();
-          timerCleanupRef.current = null;
-        };
-      }
+    if (sessionId && sessionId !== sessionIdRef.current) {
+      console.log('TimerManager: New session, resetting question timer');
+      currentQuestionRef.current = 0;
+      isActiveRef.current = false;
+      sessionIdRef.current = sessionId;
     }
-    
-    // Cleanup function
-    return () => {
-      if (timerCleanupRef.current) {
-        timerCleanupRef.current();
+  }, [sessionId]);
+
+  // Manage question timer based on current question
+  useEffect(() => {
+    // Don't start timer if conditions aren't met
+    if (isLoading || !sessionId || questionsLength === 0 || isSubmitting) {
+      if (isActiveRef.current) {
+        console.log('TimerManager: Stopping timer due to conditions');
+        stopTimer();
+        isActiveRef.current = false;
       }
-    };
+      return;
+    }
+
+    // Only change timer if question actually changed
+    if (currentQuestionRef.current !== currentQuestion) {
+      console.log('TimerManager: Question changed from', currentQuestionRef.current, 'to', currentQuestion);
+      
+      // Stop previous timer if running
+      if (isActiveRef.current) {
+        stopTimer();
+      }
+      
+      // Start new timer for current question
+      startTimer(currentQuestion);
+      currentQuestionRef.current = currentQuestion;
+      isActiveRef.current = true;
+    }
   }, [currentQuestion, isLoading, questionsLength, sessionId, isSubmitting, startTimer, stopTimer]);
 
   const cleanupTimers = () => {
-    if (timerCleanupRef.current) {
-      timerCleanupRef.current();
+    console.log('TimerManager: Cleanup called');
+    if (isActiveRef.current) {
+      stopTimer();
+      isActiveRef.current = false;
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      console.log('TimerManager: Component unmounting');
+      cleanupTimers();
+    };
+  }, []);
 
   return {
     getTimeSpent,
