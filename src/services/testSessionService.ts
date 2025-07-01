@@ -91,15 +91,23 @@ export const deleteTestSession = async (sessionId: string): Promise<void> => {
   console.log('Deleting test session:', sessionId);
   
   try {
-    // Delete in order: tracking -> answers -> session
+    // Delete in specific order to avoid foreign key conflicts
     
-    // 1. Delete tracking data (non-critical)
-    await supabase
-      .from('test_session_tracking')
-      .delete()
-      .eq('session_id', sessionId);
+    // 1. Delete tracking data (non-critical, can fail silently)
+    try {
+      const { error: trackingError } = await supabase
+        .from('test_session_tracking')
+        .delete()
+        .eq('session_id', sessionId);
+      
+      if (trackingError) {
+        console.warn('Non-critical: Could not delete tracking data:', trackingError);
+      }
+    } catch (trackingDeleteError) {
+      console.warn('Non-critical tracking deletion error:', trackingDeleteError);
+    }
 
-    // 2. Delete user answers
+    // 2. Delete user answers (critical)
     const { error: answersError } = await supabase
       .from('user_answers')
       .delete()
@@ -110,7 +118,7 @@ export const deleteTestSession = async (sessionId: string): Promise<void> => {
       throw answersError;
     }
 
-    // 3. Delete test session
+    // 3. Delete test session (critical)
     const { error: sessionError } = await supabase
       .from('test_sessions')
       .delete()
